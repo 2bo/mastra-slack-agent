@@ -115,6 +115,7 @@ export const searchEvents = createTool({
 export const createEvent = createTool({
   id: 'createEvent',
   description: "Create a new event in the user's Google Calendar.",
+  requireApproval: true,
   inputSchema: z.object({
     summary: z.string().describe('Title of the event'),
     startDateTime: z

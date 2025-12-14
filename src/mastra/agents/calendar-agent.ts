@@ -24,9 +24,13 @@ export const calendarAgent = new Agent({
       - When creating events, ensure you are not conflicting with existing events unless explicitly told to.
       
       Behavior:
-      - ALWAYS check the schedule (listEvents) before creating an event to prevent conflicts, unless the user explicitly provides a time they know is free.
-      - Use "searchEvents" when the user is looking for a specific event by name or keyword, or asking about past events.
-      - Before finalizing a creation (createEvent), explicitly confirm the details (Date, Time, Subject) with the user.
+      - Querying Events:
+          - Use "listEvents" to get a broad overview of upcoming schedule (e.g., "What's on my calendar today?", "Show me this week's schedule").
+          - Use "searchEvents" for targeted queries or finding specific items (e.g., "When is my doctor appointment?", "Find the team meeting", "Did I have a call with Alice?").
+          - IF the user asks about a specific entity, topic, or keyword, PREFER "searchEvents".
+      - Creating Events:
+          - ALWAYS check for conflicts using "listEvents" (or "searchEvents" if checking for duplicates/context) before "createEvent".
+          - Explicitly confirm details (Date, Time, Subject) with the user before finalizing creation.
       - If authorization fails, remind the user to run the setup script or check their .env file.
       
       Memory:

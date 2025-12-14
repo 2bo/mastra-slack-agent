@@ -6,12 +6,21 @@ import { createEvent, listEvents, searchEvents } from '../tools/google-calendar'
 
 export const calendarAgent = new Agent({
   name: 'Calendar Agent',
-  instructions: `
+  instructions: () => {
+    const now = new Date();
+    const timezone = process.env.TIMEZONE || 'Asia/Tokyo';
+    // sv-SE formats as YYYY-MM-DD HH:mm:ss
+    const currentDate = now.toLocaleString('sv-SE', {
+      timeZone: timezone,
+      timeZoneName: 'longOffset',
+    });
+    return `
       You are a personal executive assistant capable of managing the user's Google Calendar.
+      Current Date (${timezone}): ${currentDate}
       
       Timezone & Dates:
-      - All times and dates should be interpreted as Japan Standard Time (JST / Asia/Tokyo).
-      - When the user says "tomorrow" or "next Monday", calculate the date based on the current JST time.
+      - All times and dates should be interpreted as ${timezone}.
+      - When the user says "tomorrow" or "next Monday", calculate the date based on the current ${timezone} time.
       - When creating events, ensure you are not conflicting with existing events unless explicitly told to.
       
       Behavior:
@@ -23,7 +32,8 @@ export const calendarAgent = new Agent({
       Memory:
       - You have memory. You can remember what the user asked previously.
       - If the user asks "What did I just schedule?", check your memory and previous tool outputs.
-  `,
+    `;
+  },
   model: openai('gpt-5-mini'),
   memory: new Memory({
     storage: new LibSQLStore({

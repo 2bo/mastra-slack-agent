@@ -13,8 +13,7 @@ export const completenessScorer = createCompletenessScorer();
 // Custom LLM-judged scorer: evaluates if non-English locations are translated appropriately
 export const translationScorer = createScorer({
   name: 'Translation Quality',
-  description:
-    'Checks that non-English location names are translated and used correctly',
+  description: 'Checks that non-English location names are translated and used correctly',
   type: 'agent',
   judge: {
     model: 'openai/gpt-4o-mini',
@@ -31,8 +30,7 @@ export const translationScorer = createScorer({
     return { userText, assistantText };
   })
   .analyze({
-    description:
-      'Extract location names and detect language/translation adequacy',
+    description: 'Extract location names and detect language/translation adequacy',
     outputSchema: z.object({
       nonEnglish: z.boolean(),
       translated: z.boolean(),
@@ -63,14 +61,32 @@ export const translationScorer = createScorer({
         `,
   })
   .generateScore(({ results }) => {
-    const r = (results as any)?.analyzeStepResult || {};
+    const r =
+      (
+        results as {
+          analyzeStepResult?: {
+            nonEnglish?: boolean;
+            translated?: boolean;
+            confidence?: number;
+          };
+        }
+      )?.analyzeStepResult || {};
     if (!r.nonEnglish) return 1; // If not applicable, full credit
-    if (r.translated)
-      return Math.max(0, Math.min(1, 0.7 + 0.3 * (r.confidence ?? 1)));
+    if (r.translated) return Math.max(0, Math.min(1, 0.7 + 0.3 * (r.confidence ?? 1)));
     return 0; // Non-English but not translated
   })
   .generateReason(({ results, score }) => {
-    const r = (results as any)?.analyzeStepResult || {};
+    const r =
+      (
+        results as {
+          analyzeStepResult?: {
+            nonEnglish?: boolean;
+            translated?: boolean;
+            confidence?: number;
+            explanation?: string;
+          };
+        }
+      )?.analyzeStepResult || {};
     return `Translation scoring: nonEnglish=${r.nonEnglish ?? false}, translated=${r.translated ?? false}, confidence=${r.confidence ?? 0}. Score=${score}. ${r.explanation ?? ''}`;
   });
 

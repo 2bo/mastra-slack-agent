@@ -2,7 +2,7 @@ import { openai } from '@ai-sdk/openai';
 import { Agent } from '@mastra/core/agent';
 import { LibSQLStore } from '@mastra/libsql';
 import { Memory } from '@mastra/memory';
-import { createEvent, listEvents } from '../tools/google-calendar';
+import { createEvent, listEvents, searchEvents } from '../tools/google-calendar';
 
 export const calendarAgent = new Agent({
   name: 'Calendar Agent',
@@ -16,6 +16,7 @@ export const calendarAgent = new Agent({
       
       Behavior:
       - ALWAYS check the schedule (listEvents) before creating an event to prevent conflicts, unless the user explicitly provides a time they know is free.
+      - Use "searchEvents" when the user is looking for a specific event by name or keyword, or asking about past events.
       - Before finalizing a creation (createEvent), explicitly confirm the details (Date, Time, Subject) with the user.
       - If authorization fails, remind the user to run the setup script or check their .env file.
       
@@ -32,5 +33,6 @@ export const calendarAgent = new Agent({
   tools: {
     listEvents,
     createEvent,
+    searchEvents,
   },
 });

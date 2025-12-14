@@ -62,6 +62,56 @@ export const listEvents = createTool({
   },
 });
 
+export const searchEvents = createTool({
+  id: 'searchEvents',
+  description:
+    'Search for events in the google calendar using a query string and optional time range.',
+  inputSchema: z.object({
+    query: z
+      .string()
+      .describe('Free text search term to find events (e.g., "team meeting", "lunch").'),
+    timeMin: z
+      .string()
+      .optional()
+      .describe('Start of the search range in ISO format. Defaults to now.'),
+    timeMax: z.string().optional().describe('End of the search range in ISO format.'),
+    limit: z.number().optional().describe('Max number of events to return. Default 10.'),
+  }),
+  execute: async ({ context }) => {
+    try {
+      const calendar = getCalendarClient();
+      const response = await calendar.events.list({
+        calendarId: getCalendarId(),
+        q: context.query,
+        timeMin: context.timeMin || new Date().toISOString(),
+        timeMax: context.timeMax,
+        maxResults: context.limit || 10,
+        singleEvents: true,
+        orderBy: 'startTime',
+        timeZone: 'Asia/Tokyo',
+      });
+
+      const events = response.data.items || [];
+      if (events.length === 0) {
+        return { message: 'No matching events found.' };
+      }
+
+      return {
+        events: events.map((event) => ({
+          summary: event.summary,
+          start: event.start?.dateTime || event.start?.date,
+          end: event.end?.dateTime || event.end?.date,
+          id: event.id,
+          description: event.description,
+          location: event.location,
+        })),
+      };
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : String(error) };
+    }
+  },
+});
+
 export const createEvent = createTool({
   id: 'createEvent',
   description: "Create a new event in the user's Google Calendar.",

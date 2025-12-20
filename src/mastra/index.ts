@@ -2,14 +2,17 @@ import { Mastra } from '@mastra/core/mastra';
 import { LibSQLStore } from '@mastra/libsql';
 import { PinoLogger } from '@mastra/loggers';
 import { calendarAgent } from './agents/calendar-agent';
+import { routingAgent } from './agents/routing-agent';
 
 export const mastra = new Mastra({
-  workflows: {},
-  agents: { calendarAgent },
+  agents: {
+    calendarAgent,
+    routingAgent,
+  },
   scorers: {},
   storage: new LibSQLStore({
     // stores observability, scores, ... into memory storage, if it needs to persist, change to file:../mastra.db
-    url: ':memory:',
+    url: 'file:mastra.db',
   }),
   logger: new PinoLogger({
     name: 'Mastra',

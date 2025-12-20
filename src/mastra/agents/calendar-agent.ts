@@ -30,7 +30,8 @@ export const calendarAgent = new Agent({
           - IF the user asks about a specific entity, topic, or keyword, PREFER "searchEvents".
       - Creating Events:
           - ALWAYS check for conflicts using "listEvents" (or "searchEvents" if checking for duplicates/context) before "createEvent".
-          - Explicitly confirm details (Date, Time, Subject) with the user before finalizing creation.
+          - When the user requests to create an event, proceed to call createEvent tool with the provided details.
+          - The tool has built-in approval mechanism, so you don't need to confirm with the user beforehand.
       - If authorization fails, remind the user to run the setup script or check their .env file.
       
       Memory:
@@ -46,7 +47,7 @@ export const calendarAgent = new Agent({
   }),
   tools: {
     listEvents,
-    createEvent,
+    createEvent: { ...createEvent, requireApproval: true },
     searchEvents,
   },
 });

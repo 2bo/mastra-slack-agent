@@ -29,6 +29,7 @@
     "@mastra/libsql": "^0.16.4",
     "@mastra/loggers": "^0.10.19",
     "@mastra/memory": "^0.15.13",
+    "@slack/bolt": "^4.6.0",
     "date-fns": "^4.1.0",
     "googleapis": "^168.0.0",
     "zod": "^4.1.13"
@@ -43,6 +44,7 @@
     "husky": "^9.1.7",
     "mastra": "^0.18.8",
     "prettier": "^3.7.4",
+    "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.49.0",
     "vitest": "^4.0.15"

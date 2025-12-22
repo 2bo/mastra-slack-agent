@@ -26,15 +26,16 @@ export const ACTION_ID_PREFIXES = {
 
 /**
  * Action ID builder
- * @example buildActionId('approve', runId, toolCallId) => 'approve:abc123:def456'
+ * @example buildActionId('APPROVE', 'calendar', runId, toolCallId) => 'approve:calendar:abc123:def456'
  */
-export function buildActionId(
+export const buildActionId = (
   prefix: keyof typeof ACTION_ID_PREFIXES,
+  agentName: string,
   runId: string,
   toolCallId: string,
-): string {
-  return `${ACTION_ID_PREFIXES[prefix]}${ACTION_ID_DELIMITER}${runId}${ACTION_ID_DELIMITER}${toolCallId}`;
-}
+): string => {
+  return `${ACTION_ID_PREFIXES[prefix]}${ACTION_ID_DELIMITER}${agentName}${ACTION_ID_DELIMITER}${runId}${ACTION_ID_DELIMITER}${toolCallId}`;
+};
 
 // ============================================
 // UI Messages & Emojis

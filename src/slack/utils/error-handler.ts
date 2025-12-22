@@ -4,15 +4,15 @@ import { MESSAGES } from '../constants';
 /**
  * エラーメッセージをフォーマット
  */
-export function formatErrorMessage(error: unknown): string {
+export const formatErrorMessage = (error: unknown): string => {
   return `${MESSAGES.ERROR_PREFIX}${error instanceof Error ? error.message : String(error)}`;
-}
+};
 
 /**
  * 統合エラーハンドラー
  * ログ出力 + Slackへのエラー通知を一括処理
  */
-export async function handleError(params: {
+export const handleError = async (params: {
   logPrefix: string;
   logMessage: string;
   error: unknown;
@@ -20,7 +20,7 @@ export async function handleError(params: {
   channel: string;
   threadTs?: string;
   messageTs?: string;
-}): Promise<void> {
+}): Promise<void> => {
   const { logPrefix, logMessage, error, client, channel, threadTs, messageTs } = params;
 
   // ログ出力
@@ -40,4 +40,4 @@ export async function handleError(params: {
   } catch (notifyError) {
     console.error('[ErrorHandler] Failed to notify error:', notifyError);
   }
-}
+};

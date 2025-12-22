@@ -12,6 +12,7 @@ import { serializeMetadata } from '../utils/metadata';
 
 // tool-call-approval イベントの型
 export interface ToolCallApprovalPayload {
+  agentName: string;
   runId: string;
   toolCallId: string;
   toolName: string;
@@ -19,7 +20,7 @@ export interface ToolCallApprovalPayload {
 }
 
 // Slack Block Kit構造を生成
-export function buildApprovalBlocks(payload: ToolCallApprovalPayload): KnownBlock[] {
+export const buildApprovalBlocks = (payload: ToolCallApprovalPayload): KnownBlock[] => {
   return [
     {
       type: 'section',
@@ -35,26 +36,26 @@ export function buildApprovalBlocks(payload: ToolCallApprovalPayload): KnownBloc
           type: 'button',
           text: { type: 'plain_text', text: BUTTON_LABELS.APPROVE },
           style: 'primary',
-          action_id: buildActionId('APPROVE', payload.runId, payload.toolCallId),
+          action_id: buildActionId('APPROVE', payload.agentName, payload.runId, payload.toolCallId),
         },
         {
           type: 'button',
           text: { type: 'plain_text', text: BUTTON_LABELS.REJECT },
           style: 'danger',
-          action_id: buildActionId('REJECT', payload.runId, payload.toolCallId),
+          action_id: buildActionId('REJECT', payload.agentName, payload.runId, payload.toolCallId),
         },
       ],
     },
   ];
-}
+};
 
 // 承認リクエストメッセージを投稿
-export async function postApprovalRequest(
+export const postApprovalRequest = async (
   client: WebClient,
   channel: string,
   threadTs: string | undefined,
   payload: ToolCallApprovalPayload,
-): Promise<{ ts: string }> {
+): Promise<{ ts: string }> => {
   const result = await client.chat.postMessage({
     channel,
     thread_ts: threadTs,
@@ -63,15 +64,15 @@ export async function postApprovalRequest(
   });
 
   return { ts: result.ts! };
-}
+};
 
 // 承認メッセージを更新
-export async function updateApprovalMessage(
+export const updateApprovalMessage = async (
   client: WebClient,
   channel: string,
   ts: string,
   status: 'approved' | 'rejected',
-): Promise<void> {
+): Promise<void> => {
   const emoji = status === 'approved' ? MESSAGES.APPROVED_EMOJI : MESSAGES.REJECTED_EMOJI;
   const text = status === 'approved' ? MESSAGES.APPROVED_TEXT : MESSAGES.REJECTED_TEXT;
 
@@ -81,15 +82,20 @@ export async function updateApprovalMessage(
     text: `${emoji} ${text}`,
     blocks: [], // ボタン削除
   });
-}
+};
 
 /**
  * 却下理由入力モーダルビューを構築
  */
-export function buildRejectionModal(metadata: ApprovalMetadata): ModalView {
+export const buildRejectionModal = (metadata: ApprovalMetadata): ModalView => {
   return {
     type: 'modal',
-    callback_id: buildActionId('REJECT_REASON', metadata.runId, metadata.toolCallId),
+    callback_id: buildActionId(
+      'REJECT_REASON',
+      metadata.agentName,
+      metadata.runId,
+      metadata.toolCallId,
+    ),
     private_metadata: serializeMetadata(metadata),
     title: { type: 'plain_text', text: MODAL_TITLES.REJECTION_REASON },
     blocks: [
@@ -106,4 +112,4 @@ export function buildRejectionModal(metadata: ApprovalMetadata): ModalView {
     ],
     submit: { type: 'plain_text', text: BUTTON_LABELS.SUBMIT },
   };
-}
+};

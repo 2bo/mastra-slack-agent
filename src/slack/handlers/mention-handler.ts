@@ -1,11 +1,12 @@
 import { SayFn, SlackEventMiddlewareArgs } from '@slack/bolt';
 import { WebClient } from '@slack/web-api';
-import { routeToAgent } from '../../mastra/utils/route-to-agent';
-import { agentExecutor } from '../../mastra/services/agent-executor';
+import { mastra } from '../../mastra';
+import { executeAgent } from '../../mastra/services/agent-executor';
 import { LOG_PREFIXES, MESSAGES } from '../constants';
-import { getChatStreamClient } from '../utils/chat-stream';
 import { postApprovalRequest } from '../ui/approval-blocks';
+import { getChatStreamClient, streamToSlack } from '../utils/chat-stream';
 import { handleError } from '../utils/error-handler';
+import { generateThreadId } from '../utils/thread-id';
 
 /**
  * Slackメンション処理
@@ -17,7 +18,7 @@ export const handleMention = async ({
   say,
   client,
 }: SlackEventMiddlewareArgs<'app_mention'> & { say: SayFn; client: WebClient }) => {
-  const { channel, text, thread_ts, ts } = event;
+  const { channel, text, thread_ts, ts, team, user } = event;
   const chatClient = getChatStreamClient(client);
 
   // ユーザークエリ抽出
@@ -28,40 +29,60 @@ export const handleMention = async ({
     return;
   }
 
-  // 処理中メッセージ投稿
-  const { ts: messageTs } = await chatClient.postMessage({
+  // userが存在しない場合はエラー
+  if (!user) {
+    await say('Unable to identify user');
+    return;
+  }
+
+  // 親メッセージ投稿（ストリーミングのスレッド起点）
+  const { ts: parentTs } = await chatClient.postMessage({
     channel,
     thread_ts: thread_ts || ts,
     text: MESSAGES.PROCESSING,
   });
 
+  // Slackストリーミング開始（共有チャンネル対応）
   try {
-    // 1️⃣ LLMでルーティング判断 (structured output)
-    const agent = await routeToAgent(cleanText);
+    const result = await streamToSlack(
+      chatClient,
+      channel,
+      parentTs ?? ts,
+      async (onChunk: (text: string) => Promise<void>) => {
+        return await executeAgent(
+          mastra.getAgent('assistantAgent'),
+          cleanText,
+          {
+            resourceId: user,
+            threadId: generateThreadId(channel, thread_ts, ts),
+          },
+          onChunk,
+        );
+      },
+      team,
+      user,
+    );
 
-    // 2️⃣ エージェント実行 (責務分離)
-    const result = await agentExecutor.execute(agent, cleanText, {
-      resourceId: channel,
-      threadId: thread_ts || ts,
-    });
+    // streamToSlack closes the stream on finish. capture result.
 
-    // 3️⃣ 結果に応じたUI更新
     await updateMessageForResult({
-      result,
+      result: result as Awaited<ReturnType<typeof executeAgent>>, // Cast because helper returns string | object
       client,
       chatClient,
       channel,
-      messageTs: messageTs ?? ts,
-      threadTs: thread_ts || ts,
+      messageTs: parentTs ?? ts,
+      threadTs: thread_ts || ts, // Original logic passed this to updateMessage
+      agentName: 'unified',
     });
   } catch (error) {
+    // streamToSlack closes stream on error too.
     await handleError({
       logPrefix: LOG_PREFIXES.MENTION_HANDLER,
       logMessage: 'Unexpected error',
       error,
       client,
       channel,
-      messageTs: messageTs ?? ts,
+      messageTs: parentTs ?? ts,
     });
   }
 };
@@ -70,19 +91,21 @@ export const handleMention = async ({
  * エージェント実行結果に応じてメッセージを更新
  */
 async function updateMessageForResult(params: {
-  result: Awaited<ReturnType<typeof agentExecutor.execute>>;
+  result: Awaited<ReturnType<typeof executeAgent>>;
   client: WebClient;
   chatClient: ReturnType<typeof getChatStreamClient>;
   channel: string;
   messageTs: string;
   threadTs: string;
+  agentName: string;
 }) {
-  const { result, client, chatClient, channel, messageTs, threadTs } = params;
+  const { result, client, chatClient, channel, messageTs, threadTs, agentName } = params;
 
   switch (result.type) {
     case 'approval-required':
       // 承認UI表示
       await postApprovalRequest(client, channel, threadTs, {
+        agentName,
         runId: result.runId,
         toolCallId: result.toolCallId,
         toolName: result.toolName,
@@ -97,11 +120,11 @@ async function updateMessageForResult(params: {
       break;
 
     case 'completed':
-      // 完了メッセージ表示
-      await chatClient.update({
+      // ストリーミング完了 - 既にstopStreamでメッセージは表示済み
+      // 親メッセージ（「処理中...」）を削除してスレッドをクリーンに
+      await client.chat.delete({
         channel,
         ts: messageTs,
-        text: result.text,
       });
       break;
 

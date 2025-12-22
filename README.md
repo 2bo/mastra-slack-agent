@@ -199,8 +199,8 @@ src/
 ```bash
 # 開発・起動
 npm run dev          # Mastra Playground起動（ブラウザでテスト）
-npm run dev:slack    # Slack Bot起動（開発モード・TypeScript直接実行）
-npm run start:slack  # Slack Bot起動（開発モード）※dev:slackと同じ
+npm run dev:slack    # Slack Bot起動（開発モード・ホットリロード有効）
+npm run start:slack  # Slack Bot起動（開発モード・ホットリロード無効）
 npm run build        # 本番用ビルド
 npm start            # 本番用起動（ビルド後）
 

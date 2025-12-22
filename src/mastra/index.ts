@@ -1,13 +1,11 @@
 import { Mastra } from '@mastra/core/mastra';
 import { LibSQLStore } from '@mastra/libsql';
 import { PinoLogger } from '@mastra/loggers';
-import { calendarAgent } from './agents/calendar-agent';
-import { routingAgent } from './agents/routing-agent';
+import { assistantAgent } from './agents/assistant-agent';
 
 export const mastra = new Mastra({
   agents: {
-    calendarAgent,
-    routingAgent,
+    assistantAgent,
   },
   scorers: {},
   storage: new LibSQLStore({

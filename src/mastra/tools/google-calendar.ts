@@ -125,8 +125,11 @@ export const createEvent = createTool({
     description: z.string().optional().describe('Description of the event'),
   }),
   execute: async ({ context }) => {
+    console.log('[DEBUG] createEvent called with context:', JSON.stringify(context, null, 2));
     try {
       const calendar = getCalendarClient();
+      console.log('[DEBUG] Calendar client initialized.');
+
       const event = {
         summary: context.summary,
         description: context.description,
@@ -140,10 +143,14 @@ export const createEvent = createTool({
         },
       };
 
+      console.log('[DEBUG] Preparing to insert event:', JSON.stringify(event, null, 2));
+
       const response = await calendar.events.insert({
         calendarId: getCalendarId(),
         requestBody: event,
       });
+
+      console.log('[DEBUG] Event insert successful. Response ID:', response.data.id);
 
       return {
         message: 'Event created successfully',
@@ -151,6 +158,15 @@ export const createEvent = createTool({
         id: response.data.id,
       };
     } catch (error) {
+      console.error('[DEBUG] Error in createEvent:', error);
+      const err = error as { response?: { data?: unknown } };
+      if (err && typeof err === 'object' && 'response' in err) {
+        // Log usage details from the error response if available (axios/googleapis error)
+        console.error(
+          '[DEBUG] API Error Response Body:',
+          JSON.stringify(err.response?.data, null, 2),
+        );
+      }
       return { error: error instanceof Error ? error.message : String(error) };
     }
   },

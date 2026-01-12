@@ -1,13 +1,39 @@
 # 本番環境デプロイメント計画: Mastra Slack Agent
 
 ## 概要
-Mastra Slack Agentをローカル開発環境から本番環境対応のクラウドデプロイメントに移行します。RailwayプラットフォームとTursoデータベース、構造化ロギング、包括的なセキュリティ強化を実装します。
 
-**デプロイ先**: Railway (WebSocket対応、コールドスタートなし)
-**データベース**: Turso (LibSQL Cloud) - ファイルベースSQLiteから移行
-**監視**: Axiom (構造化ログ集約)
-**セキュリティ**: ユーザーホワイトリスト、レート制限、入力検証
-**推定コスト**: 月額$18-20
+Mastra Slack Agentを**月額$0-5**でクラウドデプロイします。
+
+**コスト**: 月額$0-5
+**所要時間**: 30-60分
+**必要なもの**:
+- Dockerコンテナ化
+- Tursoクラウドデータベース (無料)
+- Railwayへのデプロイ
+
+---
+
+**基本スペック**:
+- **デプロイ先**: Railway（常時稼働）
+- **Slack接続**: Socket Mode（推奨）または Events API
+- **データベース**: Turso (LibSQL Cloud) - ファイルベースSQLiteから移行
+- **推定コスト**: 月額$0-5
+
+### Slack接続モードについて
+
+**Socket Mode（デフォルト）**:
+- ✅ 公開URL不要
+- ✅ ファイアウォール越え可能
+- ⚠️ Docker/コンテナ環境で稀に接続が切れる報告あり（[#1652](https://github.com/slackapi/node-slack-sdk/issues/1652), [#1906](https://github.com/slackapi/bolt-js/issues/1906)）
+- 設定: `SLACK_SOCKET_MODE=true` + `SLACK_APP_TOKEN`
+- 本プロジェクトは最新のsocket-mode v2を使用（多くの問題は修正済み）
+
+**Events API（代替案）**:
+- ✅ より安定した配信
+- ⚠️ 公開URLが必要（RailwayのドメインをSlack App設定に追加）
+- 設定: `SLACK_SOCKET_MODE=false`（SLACK_APP_TOKEN不要）
+
+**推奨**: Socket Modeで開始し、接続問題が頻発する場合のみEvents APIに切り替える
 
 ---
 
@@ -30,14 +56,10 @@ Node.js 22 ES modules向けにマルチステージビルドで最適化:
 - データベースファイルは含めない (Tursoへ移行)
 - CMD: `npx tsx src/index.ts`
 
-### 1.2 .dockerignoreの作成
+### 1.2 .dockerignoreの作成（オプション）
 **新規ファイル**: `.dockerignore`
 
-ビルドコンテキストから除外:
-- `node_modules`, `.env`, `mastra.db*`
-- `.git`, `.github`, `.husky`
-- ドキュメントとテストファイル
-- ビルドコンテキストを ~200MB から ~5MB に削減
+ビルド高速化のため、不要なファイルを除外できます（必須ではありません）。
 
 ---
 
@@ -97,252 +119,110 @@ vector: new LibSQLVector({
 
 ---
 
-## フェーズ3: セキュリティ強化
+## フェーズ3: Railwayデプロイメント (最小構成)
 
-### 3.1 シークレット露出の修正
-**ファイル**: [src/scripts/get-google-token.ts:36](../src/scripts/get-google-token.ts#L36)
+このフェーズで**すぐに動くSlack Botをデプロイ**できます。
 
-**現在の問題**: リフレッシュトークンがプレーンテキストでコンソールにログ出力される
-
-**修正**: トークン出力をマスクまたは制限付き権限でファイルに保存
-```typescript
-// フルトークンのconsole.logを以下に置き換え:
-console.log('GOOGLE_REFRESH_TOKEN=' + tokens.refresh_token?.substring(0, 10) + '...[REDACTED]');
-// そしてセキュアなファイルに書き込み:
-fs.writeFileSync('.env.google-token', `GOOGLE_REFRESH_TOKEN=${tokens.refresh_token}`, { mode: 0o600 });
-```
-
-### 3.2 ユーザーホワイトリスト
-**新規ファイル**: `src/slack/middleware/user-authorization.ts`
-
-認可されたSlackユーザーにボットアクセスを制限するミドルウェア:
-- `ALLOWED_SLACK_USERS`環境変数に対して`event.user`をチェック
-- ホワイトリストになければ認可エラーを返す
-- ホワイトリストが未設定の場合は全員許可 (後方互換性)
-
-**統合**: [src/index.ts:20](../src/index.ts#L20)
-```typescript
-import { checkUserAuthorization } from './slack/middleware/user-authorization';
-app.event('app_mention', checkUserAuthorization);
-```
-
-**環境変数**: `ALLOWED_SLACK_USERS=U01234ABC,U56789DEF`
-
-### 3.3 レート制限
-**新規ファイル**: `src/slack/middleware/rate-limiter.ts`
-
-`bottleneck`ライブラリを使用したユーザーごとのレート制限:
-- ユーザーあたり1分間に10リクエスト
-- ユーザーあたり最大2同時リクエスト
-- ユーザーに「レート制限超過」メッセージを返す
-
-**依存関係**: [package.json](../package.json)に追加:
-```bash
-npm install bottleneck
-npm install -D @types/bottleneck
-```
-
-**統合**: [src/index.ts:21](../src/index.ts#L21)
-```typescript
-import { rateLimitMiddleware } from './slack/middleware/rate-limiter';
-app.event('app_mention', rateLimitMiddleware);
-```
-
-### 3.4 入力検証
-**新規ファイル**: `src/slack/middleware/input-validator.ts`
-
-悪用を防ぐためのユーザー入力検証:
-- メッセージ最大長: 4000文字
-- 疑わしいパターンをブロック (XSS試行、パストラバーサル)
-- 違反時にはユーザーに検証エラーを返す
-
-**統合**: [src/index.ts:22](../src/index.ts#L22)
-```typescript
-import { validateInput } from './slack/middleware/input-validator';
-app.event('app_mention', validateInput);
-```
-
----
-
-## フェーズ4: 監視とロギング
-
-### 4.1 構造化ロギング
-**新規ファイル**: `src/utils/logger.ts`
-
-`console.log`をPino構造化ロギングに置き換え:
-- `logger`, `slackLogger`, `agentLogger`, `toolLogger`をエクスポート
-- 開発環境: きれいに整形されたカラー出力
-- 本番環境: サービス/モジュールメタデータ付きJSONログ
-- `LOG_LEVEL`環境変数で設定可能
-
-**統合**: コードベース全体の`console.log`を置き換え:
-- [src/index.ts:14,33,37](../src/index.ts#L14)
-- [src/mastra/services/agent-executor.ts:81,104,135,161](../src/mastra/services/agent-executor.ts#L81)
-- [src/mastra/tools/google-calendar.ts:128,131,145,153,165](../src/mastra/tools/google-calendar.ts#L128)
-- [src/slack/utils/error-handler.ts](../src/slack/utils/error-handler.ts)
-
-### 4.2 ログ集約 (Axiom)
-**セットアップ**:
-1. axiom.coでAxiomアカウント作成
-2. データセット作成: `mastra-slack-prod`
-3. Axiomダッシュボードから APIトークン取得
-
-**依存関係**: [package.json](../package.json)に追加:
-```bash
-npm install pino-axiom
-```
-
-**設定**: `src/utils/logger.ts`をAxiomトランスポートで更新:
-```typescript
-transport: process.env.AXIOM_TOKEN ? {
-  target: 'pino-axiom',
-  options: {
-    dataset: process.env.AXIOM_DATASET,
-    token: process.env.AXIOM_TOKEN,
-  }
-} : undefined
-```
-
-**環境変数**:
-- `AXIOM_TOKEN=xaat-...`
-- `AXIOM_DATASET=mastra-slack-prod`
-- `LOG_LEVEL=info`
-
-### 4.3 ヘルスチェックエンドポイント
-**新規ファイル**: `src/health-check.ts`
-
-Railwayのヘルス監視用HTTPサーバー:
-- `GET /health`: 稼働時間、メモリ使用量、タイムスタンプを返す
-- `GET /ready`: 準備完了プローブ (Slack接続チェックに拡張可能)
-- ポート3001で実行 (メインアプリとは別)
-
-**統合**: [src/index.ts:15](../src/index.ts#L15)
-```typescript
-import { startHealthCheckServer } from './health-check';
-
-async function main() {
-  startHealthCheckServer(3001);
-  // ... 既存のコード
-}
-```
-
-**Dockerfile**: ヘルスチェックポートを公開
-```dockerfile
-EXPOSE 3000 3001
-```
-
-### 4.4 エラーアラート
-**セットアップ**: Axiomモニター
-- クエリ: `level == "error"`
-- しきい値: 5分間で>5エラー
-- アクション: Slack #alertsチャンネルへWebhook
-
-[src/slack/utils/error-handler.ts](../src/slack/utils/error-handler.ts)を更新して完全なエラーコンテキストで構造化ロギングを使用。
-
----
-
-## フェーズ5: Railwayデプロイメント
-
-### 5.1 Railway設定
+### 3.1 Railway設定
 **新規ファイル**: `railway.toml`
 
-Railwayデプロイメント用の設定:
+最小構成のRailwayデプロイメント設定:
 - ビルダー: Dockerfile
-- 起動コマンド: `node .mastra/output/index.mjs`
-- ヘルスチェック: `/health`エンドポイント
-- 再起動ポリシー: 失敗時、最大3回リトライ
+- 起動コマンド: `npx tsx src/index.ts`
 - 環境: `NODE_ENV=production`
 
-### 5.2 環境変数 (Railwayダッシュボード)
-**必須のシークレット** (合計42個):
+```toml
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+startCommand = "npx tsx src/index.ts"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
+```
+
+### 3.2 環境変数 (Railwayダッシュボード)
+**最小構成の必須シークレット** (11個):
 ```bash
-# Slack
+# Slack (必須)
 SLACK_BOT_TOKEN=xoxb-...
 SLACK_SIGNING_SECRET=...
 SLACK_SOCKET_MODE=true
 SLACK_APP_TOKEN=xapp-...
 
-# OpenAI
+# OpenAI (必須)
 OPENAI_API_KEY=sk-...
 
-# Google Calendar
+# Google Calendar (必須)
 GOOGLE_CLIENT_ID=...
 GOOGLE_CLIENT_SECRET=...
 GOOGLE_REFRESH_TOKEN=...
 GOOGLE_CALENDAR_ID=primary
 
-# データベース (Turso)
+# データベース - Turso (必須)
 TURSO_DATABASE_URL=libsql://...
 TURSO_AUTH_TOKEN=eyJ...
 
-# 監視
-AXIOM_TOKEN=xaat-...
-AXIOM_DATASET=mastra-slack-prod
-LOG_LEVEL=info
-
-# セキュリティ
-ALLOWED_SLACK_USERS=U01234ABC,U56789DEF
-
-# アプリケーション
+# アプリケーション (オプション)
 NODE_ENV=production
 TIMEZONE=Asia/Tokyo
 ```
 
-### 5.3 代替プラットフォーム
+**注意**:
+- Axiom、レート制限などの環境変数は最小構成では不要
+- 後から追加可能
 
-**Render** (`render.yaml`):
-- ⚠️ 無料プランは15分でスピンダウン (Socket Modeが壊れる)
-- 永続的な接続にはStarterプラン ($7/月) を使用
+### 3.3 Railwayへのデプロイ手順
 
-**Fly.io** (`fly.toml`):
-- より手動的なセットアップ
-- シークレットごとに`flyctl secrets set`が必要
-- マルチリージョンデプロイメントに適している
+1. **Railwayアカウント作成**
+   - railway.app にアクセス
+   - GitHubアカウントで登録 (無料)
 
-**推奨**: シンプルさとSocket Modeサポートのため Railway
+2. **GitHubリポジトリ接続**
+   - New Project → Deploy from GitHub repo
+   - このリポジトリを選択
 
----
+3. **環境変数設定**
+   - Variables タブで上記の環境変数を設定
+   - 特に `TURSO_DATABASE_URL` と `TURSO_AUTH_TOKEN` を忘れずに
 
-## フェーズ6: CI/CDパイプライン
+4. **デプロイ実行**
+   - Railwayが自動的にDockerfileを検出してビルド
+   - ログで "Slack Bolt app is running" を確認
 
-### 6.1 GitHub Actionsワークフロー
-**新規ファイル**: `.github/workflows/deploy.yml`
+5. **動作確認**
+   - Slackで `@YourBot hello` とメンション
+   - カレンダー確認: `@YourBot show my calendar`
 
-自動デプロイメントパイプライン:
-1. **テストジョブ**: すべてのPRとmainブランチプッシュで実行
-   - 型チェック (`npm run typecheck`)
-   - Lint (`npm run lint`)
-   - テスト (`npm test`)
-   - ビルド検証 (`npm run build`)
+### 3.4 Railway無料プランの制限
 
-2. **デプロイジョブ**: mainブランチプッシュ時のみ実行 (テスト通過後)
-   - `railway-deploy`アクションを使用してRailwayへデプロイ
-   - 成功/失敗時にSlackへ通知
+**無料プラン**:
+- 初回30日間: $5クレジット
+- 以降: 月$1クレジット (非累積)
+- メモリ使用量を512MB以下に抑えることを推奨
 
-**必須シークレット** (GitHubリポジトリ設定):
-- `RAILWAY_TOKEN`: Railwayダッシュボード → Settings → Tokensから取得
-- `SLACK_DEPLOY_WEBHOOK`: デプロイ通知用Webhook URL
-
-### 6.2 ステージング環境 (オプション)
-- 別のRailwayサービスを作成: `mastra-slack-agent-staging`
-- 別のTurso DBを作成: `mastra-slack-staging`
-- `develop`ブランチからデプロイ
-- `main`へマージ前にテスト
+**超過時の対応**:
+- Railwayは従量課金に自動移行
+- 予算アラート設定を推奨 (Settings → Usage Limits)
 
 ---
 
-## フェーズ7: デプロイ実行チェックリスト
+## ✅ デプロイ完了!
 
-### デプロイ前 (ローカル)
-- [ ] テスト実行: `npm test`
+ここまでで**月額$0-5でSlack Botが稼働**します。
+
+---
+
+## デプロイ実行チェックリスト (最小構成)
+
+### ステップ1: デプロイ前準備 (ローカル)
+- [ ] ビルドが成功することを確認: `npm run build`
 - [ ] 型チェック: `npm run typecheck`
-- [ ] Lint: `npm run lint`
-- [ ] ビルド: `npm run build`
-- [ ] Dockerをローカルでテスト: `docker build -t mastra-slack-agent . && docker run --env-file .env mastra-slack-agent`
+- [ ] Dockerfileが存在することを確認
 - [ ] `.env`がgitignoreされていることを確認
-- [ ] ハードコードされたシークレットを監査: `git log -p | grep -i "token\|secret"`
 
-### Tursoセットアップ
+### ステップ2: Tursoデータベースセットアップ
 - [ ] Turso CLIインストール: `brew install tursodatabase/tap/turso`
 - [ ] ログイン: `turso auth login`
 - [ ] データベース作成: `turso db create mastra-slack-prod --location nrt`
@@ -350,39 +230,26 @@ TIMEZONE=Asia/Tokyo
 - [ ] 認証トークン作成: `turso db tokens create mastra-slack-prod`
 - [ ] (オプション) データ移行: `turso db shell mastra-slack-prod < dump.sql`
 
-### 監視セットアップ
-- [ ] Axiomアカウント作成
-- [ ] データセット作成: `mastra-slack-prod`
-- [ ] ダッシュボードからAPIトークン取得
-- [ ] エラーアラート設定 (5分間で>5エラー → Slack webhook)
-
-### Railwayデプロイメント
+### ステップ3: Railwayデプロイメント
 - [ ] Railwayアカウント作成
 - [ ] GitHubリポジトリ接続
 - [ ] 新規プロジェクト作成: `mastra-slack-agent`
-- [ ] 環境変数設定 (フェーズ5.2参照)
-- [ ] ビルド方法設定: Dockerfile
-- [ ] ヘルスチェックパス設定: `/health`
-- [ ] 再起動ポリシー設定: 失敗時、3回リトライ
-- [ ] デプロイ: `main`ブランチへプッシュまたは手動トリガー
+- [ ] 環境変数設定 (フェーズ3.2の最小構成11個を設定)
+- [ ] デプロイ実行: Railwayが自動的にDockerfileを検出してビルド
 
-### 検証
+### ステップ4: 動作確認
 - [ ] Railwayログで"Slack Bolt app is running"を確認
-- [ ] ヘルスエンドポイントテスト: `curl https://{app}.railway.app/health`
 - [ ] Slackメンションテスト: `@YourBot hello`
 - [ ] カレンダーテスト: `@YourBot show my calendar`
 - [ ] HITL承認テスト: `@YourBot create event tomorrow at 2pm`
-- [ ] Axiomダッシュボードでログを確認
-- [ ] Tursoにデータがあることを確認 (Tursoダッシュボードをチェック)
-- [ ] レート制限テスト: 15件の連続メッセージ送信
-- [ ] 認可テスト: ホワイトリストにないユーザーからのメッセージ
+- [ ] Tursoダッシュボードでデータが保存されていることを確認
 
-### デプロイ後監視 (最初の24時間)
-- [ ] Axiomでエラー率監視 (目標: <0.1%)
-- [ ] メモリ使用量確認 (目標: <800MB)
-- [ ] OpenAIコストが想定と一致することを確認
+### ステップ5: 初期監視 (最初の24時間)
+- [ ] Railwayログでエラーがないことを確認
+- [ ] メモリ使用量確認 (目標: <512MB、無料枠内)
+- [ ] OpenAIコストが想定と一致することを確認 ($1-3/月程度)
 - [ ] WebSocket切断がないことを確認
-- [ ] ユーザーフィードバックをレビュー
+- [ ] Railway使用量ダッシュボードで$5クレジット内に収まっているか確認
 
 ---
 
@@ -408,73 +275,68 @@ railway rollback
 
 ## 重要ファイル一覧
 
-### 作成するファイル (9個の新規ファイル)
-1. `Dockerfile` - マルチステージコンテナビルド
-2. `.dockerignore` - ビルド最適化
+### 作成するファイル (最小構成)
+1. `Dockerfile` - ✅ 既存
+2. `.dockerignore` - ビルド最適化（オプション）
 3. `railway.toml` - Railway デプロイ設定
-4. `src/utils/logger.ts` - 構造化ロギング
-5. `src/health-check.ts` - ヘルスエンドポイント
-6. `src/slack/middleware/user-authorization.ts` - ユーザーホワイトリスト
-7. `src/slack/middleware/rate-limiter.ts` - レート制限
-8. `src/slack/middleware/input-validator.ts` - 入力検証
-9. `.github/workflows/deploy.yml` - CI/CDパイプライン
 
-### 変更するファイル (6個の既存ファイル)
-1. [src/mastra/index.ts:11-13](../src/mastra/index.ts#L11-L13) - Turso設定追加
-2. [src/mastra/agents/assistant-agent.ts:29-34](../src/mastra/agents/assistant-agent.ts#L29-L34) - Turso設定追加 (2箇所)
-3. [src/scripts/get-google-token.ts:36](../src/scripts/get-google-token.ts#L36) - シークレット露出修正
-4. [src/index.ts](../src/index.ts) - ミドルウェアとヘルスチェック追加
-5. [package.json](../package.json) - 依存関係追加: `bottleneck`, `pino-axiom`
-6. 複数ファイル - `console.log`を構造化ロギングに置き換え
+### 変更するファイル（Turso対応のみ）
+1. [src/mastra/index.ts:11-13](../src/mastra/index.ts#L11-L13) - Turso環境変数対応
+2. [src/mastra/agents/assistant-agent.ts:29-34](../src/mastra/agents/assistant-agent.ts#L29-L34) - Turso環境変数対応
 
 ---
 
 ## コスト見積もり
 
-**月額コスト**:
-- Railway (1GB RAM): ~$10
-- Turso: $0 (無料プラン)
-- Axiom: $0 (無料プラン)
-- OpenAI API: ~$8 (1日50会話)
+### 💰 無料プラン構成 (推奨開始点)
+
+**月額コスト: $0-5**
+- Railway無料プラン: $0 (初回30日$5クレジット、以降月$1クレジット)
+- Turso: $0 (無料プラン - 500MB、月間10億行読取)
+- OpenAI API: $1-3 (1日10-20会話、GPT-4o-mini使用)
 - Google Calendar: $0 (無料プラン)
+- 監視: $0 (Railwayの基本ログのみ)
 
-**合計: $18-20/月**
+**合計: $1-5/月** (軽量使用なら無料枠内)
 
-**コスト最適化**:
-- 積極的なレート制限でOpenAI呼び出しを削減
-- 簡単なクエリにはGPT-4o-miniを使用 (90%安い)
-- OpenAIダッシュボードで予算アラート設定
+**無料枠で収める条件**:
+- メモリ使用量を512MB以下に抑える
+- OpenAI APIは1日20会話以下
+- GPT-4o-miniモデルを優先使用
+- Axiomなどの外部監視ツールは使わない
 
 ---
 
 ## 成功指標
 
 **運用**:
-- 稼働率: >99.5%
-- 応答時間: <3秒 (P95)
-- エラー率: <0.1%
-
-**セキュリティ**:
-- 不正アクセスゼロ
-- シークレット漏洩ゼロ
-- すべてのレート制限が適用される
+- Slack Botが24時間応答可能
+- 応答時間: <5秒
+- Railwayログにエラーがない
 
 **コスト**:
-- 月額コスト <$25
-- 会話あたりコスト <$0.20
+- 月額コスト: $0-5 (無料枠内)
+- OpenAI API: $1-3/月
 
 ---
 
 ## 実装タイムライン
 
-**1週目**: セキュリティとインフラストラクチャ
-- セキュリティ問題修正、Dockerfile作成、Tursoセットアップ
+**所要時間: 30-60分**
 
-**2週目**: 監視とデプロイメント
-- ロギング実装、Axiomセットアップ、Railwayステージングへデプロイ
+1. **準備** (10分)
+   - Dockerfile確認 (既に作成済み)
+   - railway.toml作成
 
-**3週目**: 本番とCI/CD
-- 本番デプロイ、GitHub Actionsセットアップ、厳密な監視
+2. **Tursoセットアップ** (10分)
+   - Turso CLIインストール
+   - データベース作成、トークン取得
 
-**4週目**: 最適化
-- 使用状況分析、コスト最適化、アラート改善
+3. **Railwayデプロイ** (20分)
+   - アカウント作成、リポジトリ接続
+   - 環境変数設定 (11個)
+   - デプロイ実行
+
+4. **動作確認** (10-20分)
+   - Slackでテスト
+   - ログ確認

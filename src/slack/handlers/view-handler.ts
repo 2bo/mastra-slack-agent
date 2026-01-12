@@ -1,8 +1,7 @@
-import { SlackViewMiddlewareArgs, ViewSubmitAction } from '@slack/bolt';
-import { WebClient } from '@slack/web-api';
 import { mastra } from '../../mastra';
 import { declineToolCall } from '../../mastra/services/agent-executor';
 import { BLOCK_IDS, LOG_PREFIXES, MESSAGES } from '../constants';
+import { ViewHandlerArgs } from '../types/handler-args';
 import { updateApprovalMessage } from '../ui/approval-blocks';
 import { getChatStreamClient } from '../utils/chat-stream';
 import { handleError } from '../utils/error-handler';
@@ -14,11 +13,7 @@ import { deserializeMetadata } from '../utils/metadata';
  * 責務: Slackイベント処理とUI更新のみ
  * エージェントロジックは AgentExecutor に委譲
  */
-export const handleViewSubmission = async ({
-  ack,
-  view,
-  client,
-}: SlackViewMiddlewareArgs<ViewSubmitAction> & { client: WebClient }) => {
+export const handleViewSubmission = async ({ ack, view, client }: ViewHandlerArgs) => {
   await ack();
 
   const callbackId = view.callback_id;

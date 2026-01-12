@@ -1,8 +1,7 @@
-import { BlockAction, SlackActionMiddlewareArgs } from '@slack/bolt';
-import { WebClient } from '@slack/web-api';
 import { mastra } from '../../mastra';
 import { approveToolCall } from '../../mastra/services/agent-executor';
 import { LOG_PREFIXES } from '../constants';
+import { ActionHandlerArgs } from '../types/handler-args';
 import { buildRejectionModal, updateApprovalMessage } from '../ui/approval-blocks';
 import { getChatStreamClient, streamToSlack } from '../utils/chat-stream';
 import { handleError } from '../utils/error-handler';
@@ -11,12 +10,7 @@ import { IdParseError, parseActionId } from '../utils/id-parser';
 /**
  * Slack承認/却下ボタン処理
  */
-export const handleAction = async ({
-  action,
-  ack,
-  body,
-  client,
-}: SlackActionMiddlewareArgs<BlockAction> & { client: WebClient }) => {
+export const handleAction = async ({ action, ack, body, client }: ActionHandlerArgs) => {
   await ack();
 
   let parsed;

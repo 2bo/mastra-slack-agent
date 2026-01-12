@@ -1,8 +1,8 @@
-import { SayFn, SlackEventMiddlewareArgs } from '@slack/bolt';
 import { WebClient } from '@slack/web-api';
 import { mastra } from '../../mastra';
 import { executeAgent } from '../../mastra/services/agent-executor';
 import { LOG_PREFIXES, MESSAGES } from '../constants';
+import { MentionHandlerArgs } from '../types/handler-args';
 import { postApprovalRequest } from '../ui/approval-blocks';
 import { getChatStreamClient, streamToSlack } from '../utils/chat-stream';
 import { handleError } from '../utils/error-handler';
@@ -13,11 +13,7 @@ import { generateThreadId } from '../utils/thread-id';
  * 責務: Slackイベント処理とUI更新のみ
  * エージェントロジックは AgentExecutor に委譲
  */
-export const handleMention = async ({
-  event,
-  say,
-  client,
-}: SlackEventMiddlewareArgs<'app_mention'> & { say: SayFn; client: WebClient }) => {
+export const handleMention = async ({ event, say, client }: MentionHandlerArgs) => {
   const { channel, text, thread_ts, ts, team, user } = event;
   const chatClient = getChatStreamClient(client);
 

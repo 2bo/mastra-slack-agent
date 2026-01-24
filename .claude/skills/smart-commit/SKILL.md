@@ -1,6 +1,6 @@
 ---
 name: smart-commit
-description: Create well-structured, atomic commits following Conventional Commits specification. Use when committing changes, reviewing staged files, or organizing commits. Detects credentials and enforces best practices.
+description: ALWAYS use this skill when creating git commits. Trigger on "commit", "コミット", "make a commit", "commit changes". Creates atomic commits following Conventional Commits spec with credential detection.
 ---
 
 # Smart Commit

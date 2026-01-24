@@ -29,6 +29,7 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Skill(smart-commit)",
+      "Skill(update-claude-md)",
       "mcp__github__get_file_contents",
       "mcp__github__search_code",
       "mcp__github__search_repositories",

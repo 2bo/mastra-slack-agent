@@ -9,6 +9,7 @@ export const mastra = new Mastra({
   },
   scorers: {},
   storage: new LibSQLStore({
+    id: 'main-store',
     // stores observability, scores, ... into memory storage, if it needs to persist, change to file:../mastra.db
     url: 'file:mastra.db',
   }),
@@ -16,12 +17,4 @@ export const mastra = new Mastra({
     name: 'Mastra',
     level: 'info',
   }),
-  telemetry: {
-    // Telemetry is deprecated and will be removed in the Nov 4th release
-    enabled: false,
-  },
-  observability: {
-    // Enables DefaultExporter and CloudExporter for AI tracing
-    default: { enabled: true },
-  },
 });

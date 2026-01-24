@@ -15,7 +15,7 @@ export type AgentExecutionResult =
 export type StreamCallback = (chunk: string) => Promise<void>;
 
 type AgentStreamOutput = Awaited<ReturnType<Agent['stream']>>;
-type StreamIterator = AgentStreamOutput['fullStream'];
+type StreamIterator = AgentStreamOutput['fullStream'] | AsyncIterable<unknown>;
 
 async function handleStream(
   stream: StreamIterator,

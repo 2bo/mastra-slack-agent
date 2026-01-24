@@ -10,8 +10,10 @@ const testAgentHITL = async () => {
   const output = await assistantAgent.stream(
     '明日15時に「技術打ち合わせ」というミーティングを1時間予約して',
     {
-      resourceId: 'routing-test-channel',
-      threadId: 'routing-test-thread',
+      memory: {
+        resource: 'routing-test-channel',
+        thread: 'routing-test-thread',
+      },
     },
   );
 
@@ -75,8 +77,10 @@ const testAgentHITL = async () => {
   console.log('\n3. Testing rejection flow...');
 
   const rejectOutput = await assistantAgent.stream('明後日10時にミーティング', {
-    resourceId: 'test-channel',
-    threadId: 'test-thread-2',
+    memory: {
+      resource: 'test-channel',
+      thread: 'test-thread-2',
+    },
   });
 
   let rejectRunId: string | undefined;

@@ -5,6 +5,7 @@ import { Memory } from '@mastra/memory';
 import { createEvent, listEvents, searchEvents } from '../tools/google-calendar';
 
 export const assistantAgent = new Agent({
+  id: 'assistant-agent',
   name: 'Assistant Agent',
   instructions: () => {
     const now = new Date();
@@ -27,10 +28,12 @@ export const assistantAgent = new Agent({
   model: openai('gpt-4o'),
   memory: new Memory({
     storage: new LibSQLStore({
+      id: 'memory-store',
       url: 'file:mastra.db',
     }),
     vector: new LibSQLVector({
-      connectionUrl: 'file:mastra.db',
+      id: 'memory-vector',
+      url: 'file:mastra.db',
     }),
     embedder: openai.embedding('text-embedding-3-small'),
     options: {

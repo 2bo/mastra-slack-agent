@@ -1,8 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createEvent, listEvents, searchEvents } from './google-calendar';
 
-type RuntimeContext = Parameters<NonNullable<typeof listEvents.execute>>[0]['runtimeContext'];
-
 const mocks = vi.hoisted(() => {
   return {
     mList: vi.fn(),
@@ -30,16 +28,6 @@ vi.mock('googleapis', () => {
 });
 
 describe('Google Calendar Tools', () => {
-  const mockRuntimeContext = {
-    logger: {
-      debug: vi.fn(),
-      info: vi.fn(),
-      warn: vi.fn(),
-      error: vi.fn(),
-    },
-    runId: 'test-run',
-  } as unknown as RuntimeContext;
-
   beforeEach(() => {
     vi.clearAllMocks();
     // Default mock implementation for list to return empty items
@@ -57,10 +45,7 @@ describe('Google Calendar Tools', () => {
 
   describe('listEvents', () => {
     it('should call calendar.events.list with correct parameters', async () => {
-      await listEvents.execute!({
-        context: { limit: 5, timeMin: '2025-01-01T00:00:00Z' },
-        runtimeContext: mockRuntimeContext,
-      });
+      await listEvents.execute!({ limit: 5, timeMin: '2025-01-01T00:00:00Z' }, {});
 
       expect(mocks.mList).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -87,10 +72,7 @@ describe('Google Calendar Tools', () => {
         },
       });
 
-      const result = await listEvents.execute!({
-        context: {},
-        runtimeContext: mockRuntimeContext,
-      });
+      const result = await listEvents.execute!({}, {});
       expect(result).toEqual({
         events: [
           {
@@ -106,10 +88,7 @@ describe('Google Calendar Tools', () => {
 
   describe('searchEvents', () => {
     it('should call events.list with query parameter', async () => {
-      await searchEvents.execute!({
-        context: { query: 'Lunch', timeMin: '2025-01-01T00:00:00Z' },
-        runtimeContext: mockRuntimeContext,
-      });
+      await searchEvents.execute!({ query: 'Lunch', timeMin: '2025-01-01T00:00:00Z' }, {});
 
       expect(mocks.mList).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -122,15 +101,15 @@ describe('Google Calendar Tools', () => {
 
   describe('createEvent', () => {
     it('should call events.insert with correct body', async () => {
-      await createEvent.execute!({
-        context: {
+      await createEvent.execute!(
+        {
           summary: 'New Meeting',
           startDateTime: '2025-12-15T10:00:00+09:00',
           endDateTime: '2025-12-15T11:00:00+09:00',
           description: 'Discuss plans',
         },
-        runtimeContext: mockRuntimeContext,
-      });
+        {},
+      );
 
       expect(mocks.mInsert).toHaveBeenCalledWith(
         expect.objectContaining({

@@ -31,13 +31,13 @@ export const listEvents = createTool({
     limit: z.number().optional().describe('Max number of events to return. Default 10.'),
     timeMin: z.string().optional().describe('ISO string for start time. Defaults to now.'),
   }),
-  execute: async ({ context }) => {
+  execute: async (inputData) => {
     try {
       const calendar = getCalendarClient();
       const response = await calendar.events.list({
         calendarId: getCalendarId(),
-        timeMin: context.timeMin || new Date().toISOString(),
-        maxResults: context.limit || 10,
+        timeMin: inputData.timeMin || new Date().toISOString(),
+        maxResults: inputData.limit || 10,
         singleEvents: true,
         orderBy: 'startTime',
         timeZone: 'Asia/Tokyo', // Request response in JST if possible, though ISO strings are absolute
@@ -77,15 +77,15 @@ export const searchEvents = createTool({
     timeMax: z.string().optional().describe('End of the search range in ISO format.'),
     limit: z.number().optional().describe('Max number of events to return. Default 10.'),
   }),
-  execute: async ({ context }) => {
+  execute: async (inputData) => {
     try {
       const calendar = getCalendarClient();
       const response = await calendar.events.list({
         calendarId: getCalendarId(),
-        q: context.query,
-        timeMin: context.timeMin || new Date().toISOString(),
-        timeMax: context.timeMax,
-        maxResults: context.limit || 10,
+        q: inputData.query,
+        timeMin: inputData.timeMin || new Date().toISOString(),
+        timeMax: inputData.timeMax,
+        maxResults: inputData.limit || 10,
         singleEvents: true,
         orderBy: 'startTime',
         timeZone: 'Asia/Tokyo',
@@ -124,21 +124,21 @@ export const createEvent = createTool({
     endDateTime: z.string().describe('End time in ISO format (e.g., 2025-12-15T11:00:00+09:00)'),
     description: z.string().optional().describe('Description of the event'),
   }),
-  execute: async ({ context }) => {
-    console.log('[DEBUG] createEvent called with context:', JSON.stringify(context, null, 2));
+  execute: async (inputData) => {
+    console.log('[DEBUG] createEvent called with inputData:', JSON.stringify(inputData, null, 2));
     try {
       const calendar = getCalendarClient();
       console.log('[DEBUG] Calendar client initialized.');
 
       const event = {
-        summary: context.summary,
-        description: context.description,
+        summary: inputData.summary,
+        description: inputData.description,
         start: {
-          dateTime: context.startDateTime,
+          dateTime: inputData.startDateTime,
           timeZone: 'Asia/Tokyo',
         },
         end: {
-          dateTime: context.endDateTime,
+          dateTime: inputData.endDateTime,
           timeZone: 'Asia/Tokyo',
         },
       };

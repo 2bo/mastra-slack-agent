@@ -3,7 +3,7 @@ import { declineToolCall } from '../../mastra/services/agent-executor';
 import { BLOCK_IDS, LOG_PREFIXES, MESSAGES } from '../constants';
 import { ViewHandlerArgs } from '../types/handler-args';
 import { updateApprovalMessage } from '../ui/approval-blocks';
-import { getChatStreamClient } from '../utils/chat-stream';
+import { getChatStreamClient, streamToSlack } from '../utils/chat-stream';
 import { handleError } from '../utils/error-handler';
 import { IdParseError, parseCallbackId } from '../utils/id-parser';
 import { deserializeMetadata } from '../utils/metadata';
@@ -55,57 +55,20 @@ export const handleViewSubmission = async ({ ack, view, client }: ViewHandlerArg
 
   const chatClient = getChatStreamClient(client);
 
-  // Slackストリーミング開始 (却下後の実行結果をストリーミング)
-  const streamResponse = await chatClient.startStream({
-    channel: channelId,
-    thread_ts: threadTs ?? messageTs, // threadTsがない場合はmessageTsを使用
-  });
-  const streamTs = streamResponse.ts;
-
-  // ストリーミング状態管理
-  let streamOpen = true;
+  // NOTE: reason はまだ Agent API でサポートされていないため、ログ出力のみ
+  console.log(`${LOG_PREFIXES.VIEW_HANDLER} Rejection reason: ${reason}`);
 
   try {
-    // エージェント却下処理 (責務分離)
-    // NOTE: reason はまだ Agent API でサポートされていないため、ログ出力のみ
-    console.log(`${LOG_PREFIXES.VIEW_HANDLER} Rejection reason: ${reason}`);
-
-    // 却下実行 + ストリーミングコールバック
-    const resultText = await declineToolCall(
-      mastra.getAgent('assistantAgent'),
-      runId,
-      toolCallId,
-      // ストリーミングコールバック
-      async (chunk: string) => {
-        if (streamOpen && streamTs) {
-          await chatClient.appendStream({
-            channel: channelId,
-            ts: streamTs,
-            markdown_text: chunk,
-          });
-        }
-      },
+    // 統一されたストリーミング処理を使用
+    await streamToSlack(
+      chatClient,
+      channelId,
+      threadTs ?? messageTs, // threadTsがない場合はmessageTsを使用
+      async (onChunk) =>
+        declineToolCall(mastra.getAgent('assistantAgent'), runId, toolCallId, onChunk),
+      { finalTextPrefix: MESSAGES.REJECTED_PREFIX },
     );
-
-    // ストリーミング終了
-    streamOpen = false;
-    if (streamTs) {
-      await chatClient.stopStream({
-        channel: channelId,
-        ts: streamTs,
-        markdown_text: `${MESSAGES.REJECTED_PREFIX}${resultText}`, // 最終テキスト
-      });
-    }
   } catch (error) {
-    // エラー時もストリーミング終了
-    streamOpen = false;
-    if (streamTs) {
-      await chatClient.stopStream({
-        channel: channelId,
-        ts: streamTs,
-      });
-    }
-
     await handleError({
       logPrefix: LOG_PREFIXES.VIEW_HANDLER,
       logMessage: 'Error declining tool call',

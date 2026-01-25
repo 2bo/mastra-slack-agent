@@ -58,14 +58,21 @@ export const getChatStreamClient = (client: WebClient): ChatStreamClient => {
   };
 };
 
+export type StreamToSlackOptions = {
+  teamId?: string;
+  userId?: string;
+  /** 最終テキストに付与するプレフィックス（例: "❌ Rejected. Agent response:\n"） */
+  finalTextPrefix?: string;
+};
+
 export const streamToSlack = async (
   chatClient: ChatStreamClient,
   channel: string,
   threadTs: string | undefined,
   executor: (onChunk: (text: string) => Promise<void>) => Promise<string | { type: string }>,
-  teamId?: string,
-  userId?: string,
+  options: StreamToSlackOptions = {},
 ) => {
+  const { teamId, userId, finalTextPrefix } = options;
   const streamResponse = await chatClient.startStream({
     channel,
     thread_ts: threadTs,
@@ -95,7 +102,8 @@ export const streamToSlack = async (
       // But we have been accumulating in fullText.
       // Usually valid agent stream result matches accumulation.
       // However, let's ensure we flush the latest available text.
-      const finalText = typeof result === 'string' ? result : fullText;
+      const baseText = typeof result === 'string' ? result : fullText;
+      const finalText = finalTextPrefix ? `${finalTextPrefix}${baseText}` : baseText;
 
       await chatClient.stopStream({
         channel,

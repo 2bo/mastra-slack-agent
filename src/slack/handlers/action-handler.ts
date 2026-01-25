@@ -37,17 +37,12 @@ export const handleAction = async ({ action, ack, body, client }: ActionHandlerA
         chatClient,
         channel.id,
         message.thread_ts,
-
-        async (onChunk: (text: string) => Promise<void>) => {
-          return await approveToolCall(
-            mastra.getAgent('assistantAgent'),
-            runId,
-            toolCallId,
-            onChunk,
-          );
+        async (onChunk) =>
+          approveToolCall(mastra.getAgent('assistantAgent'), runId, toolCallId, onChunk),
+        {
+          teamId: 'team' in body && body.team ? body.team.id : undefined,
+          userId: 'user' in body && body.user ? body.user.id : undefined,
         },
-        'team' in body && body.team ? body.team.id : undefined,
-        'user' in body && body.user ? body.user.id : undefined,
       );
     } catch (error) {
       await handleError({

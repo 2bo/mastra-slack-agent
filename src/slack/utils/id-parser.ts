@@ -1,3 +1,4 @@
+import { LEGACY_AGENT_NAME, MASTRA_LOG_PREFIXES } from '../../mastra/constants';
 import { ACTION_ID_DELIMITER } from '../constants';
 
 /**
@@ -35,8 +36,10 @@ const parseId = (id: string): ParsedActionId => {
   // 後方互換性: 旧形式 (3部) "type:runId:toolCallId"
   if (parts.length === 3 && parts.every((p) => p)) {
     const [type, runId, toolCallId] = parts;
-    console.warn(`[IdParser] Legacy 3-part ID detected: "${id}", defaulting to calendar agent`);
-    return { type, agentName: 'calendar', runId, toolCallId };
+    console.warn(
+      `${MASTRA_LOG_PREFIXES.ID_PARSER} Legacy 3-part ID detected: "${id}", defaulting to ${LEGACY_AGENT_NAME} agent`,
+    );
+    return { type, agentName: LEGACY_AGENT_NAME, runId, toolCallId };
   }
 
   // 新形式 (4部) "type:agentName:runId:toolCallId"

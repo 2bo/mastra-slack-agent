@@ -1,18 +1,71 @@
 import { Agent } from '@mastra/core/agent';
+import { DEFAULT_AGENT_NAME } from '../constants';
+
+// ============================================
+// Shared Types
+// ============================================
+
+/**
+ * ツール承認が必要な場合の結果型
+ */
+export type ApprovalRequired = {
+  type: 'approval-required';
+  agentName: string;
+  runId: string;
+  toolCallId: string;
+  toolName: string;
+  args: Record<string, unknown>;
+};
 
 export type AgentExecutionResult =
-  | {
-      type: 'approval-required';
-      agentName: string;
-      runId: string;
-      toolCallId: string;
-      toolName: string;
-      args: Record<string, unknown>;
-    }
+  | ApprovalRequired
   | { type: 'completed'; text: string }
   | { type: 'error'; error: Error };
 
 export type StreamCallback = (chunk: string) => Promise<void>;
+
+// ============================================
+// Stream Type Guards
+// ============================================
+
+/**
+ * ストリームチャンクの型定義
+ */
+type StreamChunk = {
+  type: string;
+  runId?: string;
+  payload?: Record<string, unknown>;
+};
+
+/**
+ * 型ガード: オブジェクトがStreamChunk形式かを判定
+ */
+function isStreamChunk(value: unknown): value is StreamChunk {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'type' in value &&
+    typeof (value as StreamChunk).type === 'string'
+  );
+}
+
+/**
+ * 型ガード: ペイロードがツール承認データを持つかを判定
+ */
+function hasToolCallPayload(
+  payload: unknown,
+): payload is { toolCallId: string; toolName: string; args?: Record<string, unknown> } {
+  return (
+    typeof payload === 'object' &&
+    payload !== null &&
+    'toolCallId' in payload &&
+    'toolName' in payload
+  );
+}
+
+// ============================================
+// Stream Handling
+// ============================================
 
 type AgentStreamOutput = Awaited<ReturnType<Agent['stream']>>;
 type StreamIterator = AgentStreamOutput['fullStream'] | AsyncIterable<unknown>;
@@ -20,46 +73,30 @@ type StreamIterator = AgentStreamOutput['fullStream'] | AsyncIterable<unknown>;
 async function handleStream(
   stream: StreamIterator,
   onStreamChunk?: StreamCallback,
-): Promise<
-  | string
-  | {
-      type: 'approval-required';
-      agentName: string;
-      runId: string;
-      toolCallId: string;
-      toolName: string;
-      args: Record<string, unknown>;
-    }
-> {
+): Promise<string | ApprovalRequired> {
   let fullText = '';
 
-  // Use raw stream to iterate
   for await (const chunk of stream as AsyncIterable<unknown>) {
-    const typedChunk = chunk as { type: string; runId?: string; payload?: Record<string, unknown> };
-
-    if (typedChunk.type === 'tool-call-approval') {
-      const payload = typedChunk.payload;
-      if (
-        payload &&
-        typeof payload === 'object' &&
-        'toolCallId' in payload &&
-        'toolName' in payload
-      ) {
-        return {
-          type: 'approval-required',
-          agentName: 'unified',
-          runId: typedChunk.runId || '',
-          toolCallId: String(payload['toolCallId']),
-          toolName: String(payload['toolName']),
-          args: (payload['args'] as Record<string, unknown>) || {},
-        };
-      }
+    if (!isStreamChunk(chunk)) {
+      continue;
     }
 
-    if (typedChunk.type === 'text-delta') {
-      const payload = typedChunk.payload;
+    if (chunk.type === 'tool-call-approval' && hasToolCallPayload(chunk.payload)) {
+      const payload = chunk.payload;
+      return {
+        type: 'approval-required',
+        agentName: DEFAULT_AGENT_NAME,
+        runId: chunk.runId || '',
+        toolCallId: String(payload.toolCallId),
+        toolName: String(payload.toolName),
+        args: (payload.args as Record<string, unknown>) || {},
+      };
+    }
+
+    if (chunk.type === 'text-delta') {
+      const payload = chunk.payload;
       if (payload && typeof payload === 'object' && 'text' in payload) {
-        const textChunk = String(payload['text']);
+        const textChunk = String((payload as { text: unknown }).text);
         fullText += textChunk;
         if (onStreamChunk) {
           await onStreamChunk(textChunk);

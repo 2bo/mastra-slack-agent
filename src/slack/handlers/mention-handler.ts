@@ -44,19 +44,14 @@ export const handleMention = async ({ event, say, client }: MentionHandlerArgs) 
       chatClient,
       channel,
       parentTs ?? ts,
-      async (onChunk: (text: string) => Promise<void>) => {
-        return await executeAgent(
+      async (onChunk) =>
+        executeAgent(
           mastra.getAgent('assistantAgent'),
           cleanText,
-          {
-            resourceId: user,
-            threadId: generateThreadId(channel, thread_ts, ts),
-          },
+          { resourceId: user, threadId: generateThreadId(channel, thread_ts, ts) },
           onChunk,
-        );
-      },
-      team,
-      user,
+        ),
+      { teamId: team, userId: user },
     );
 
     // streamToSlack closes the stream on finish. capture result.

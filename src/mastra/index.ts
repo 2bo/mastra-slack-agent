@@ -10,8 +10,9 @@ export const mastra = new Mastra({
   scorers: {},
   storage: new LibSQLStore({
     id: 'main-store',
-    // stores observability, scores, ... into memory storage, if it needs to persist, change to file:../mastra.db
-    url: 'file:mastra.db',
+    // Turso (cloud) or local file database
+    url: process.env.TURSO_DATABASE_URL || 'file:mastra.db',
+    authToken: process.env.TURSO_AUTH_TOKEN,
   }),
   logger: new PinoLogger({
     name: 'Mastra',

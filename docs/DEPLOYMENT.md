@@ -217,10 +217,10 @@ TIMEZONE=Asia/Tokyo
 ## デプロイ実行チェックリスト (最小構成)
 
 ### ステップ1: デプロイ前準備 (ローカル)
-- [ ] ビルドが成功することを確認: `npm run build`
-- [ ] 型チェック: `npm run typecheck`
-- [ ] Dockerfileが存在することを確認
-- [ ] `.env`がgitignoreされていることを確認
+- [x] ビルドが成功することを確認: `npm run build`
+- [x] 型チェック: `npm run typecheck`
+- [x] Dockerfileが存在することを確認
+- [x] `.env`がgitignoreされていることを確認
 
 ### ステップ2: Tursoデータベースセットアップ
 - [ ] Turso CLIインストール: `brew install tursodatabase/tap/turso`
@@ -276,13 +276,13 @@ railway rollback
 ## 重要ファイル一覧
 
 ### 作成するファイル (最小構成)
-1. `Dockerfile` - ✅ 既存
-2. `.dockerignore` - ビルド最適化（オプション）
-3. `railway.toml` - Railway デプロイ設定
+1. `Dockerfile` - ✅ 作成済み
+2. `.dockerignore` - ✅ 作成済み
+3. `railway.toml` - ✅ 作成済み
 
 ### 変更するファイル（Turso対応のみ）
-1. [src/mastra/index.ts:11-13](../src/mastra/index.ts#L11-L13) - Turso環境変数対応
-2. [src/mastra/agents/assistant-agent.ts:29-34](../src/mastra/agents/assistant-agent.ts#L29-L34) - Turso環境変数対応
+1. [src/mastra/index.ts:11-15](../src/mastra/index.ts#L11-L15) - ✅ Turso環境変数対応済み
+2. [src/mastra/agents/assistant-agent.ts:29-40](../src/mastra/agents/assistant-agent.ts#L29-L40) - ✅ Turso環境変数対応済み
 
 ---
 

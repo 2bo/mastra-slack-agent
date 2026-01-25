@@ -1,0 +1,39 @@
+# Dependencies (will be installed fresh in container)
+node_modules
+
+# Local database files (using Turso in production)
+*.db
+*.db-shm
+*.db-wal
+mastra.db*
+
+# Build outputs (will be built fresh in container)
+dist
+.mastra
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Development and IDE
+.git
+.gitignore
+.vscode
+.idea
+*.log
+
+# Documentation
+docs
+*.md
+!README.md
+
+# Tests
+**/*.test.ts
+**/*.spec.ts
+coverage
+.vitest
+
+# Miscellaneous
+.DS_Store
+Thumbs.db

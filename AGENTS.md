@@ -60,6 +60,40 @@ npm run start:slack
 
 ---
 
+## Claude Code (OpenCode) Integration
+
+This repository includes custom skills and agents for Claude Code to enhance development workflows.
+
+### Available Skills
+
+**smart-commit** (`.claude/skills/smart-commit/`)
+
+- **Trigger**: "commit", "コミット", "make a commit", "commit changes"
+- **Purpose**: Creates atomic commits following Conventional Commits specification
+- **Features**:
+  - Enforces atomic commit principles (one logical change per commit)
+  - Validates Conventional Commits format (`type(scope): description`)
+  - Detects credentials and sensitive data before committing
+  - Provides commit message templates and best practices
+
+**Usage**: Simply say "commit" or "コミット" and the skill will guide you through creating a proper commit.
+
+### Available Agents
+
+**mastra-docs** (`.claude/agents/mastra-docs.md`)
+
+- **Purpose**: Search and retrieve Mastra framework documentation
+- **Tools**: Mastra MCP tools, GitHub API, WebFetch
+- **Usage**: Ask questions about Mastra framework (e.g., "How do I create a tool in Mastra?")
+
+### When to Use Skills/Agents
+
+- **Before committing**: Use `smart-commit` skill to ensure proper commit messages
+- **When learning Mastra**: Use `mastra-docs` agent to look up framework documentation
+- **When uncertain about patterns**: These tools provide context-aware guidance
+
+---
+
 ## Code Style Guidelines
 
 ### Import Style

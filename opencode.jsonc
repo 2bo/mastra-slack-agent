@@ -1,0 +1,172 @@
+{
+  // OpenCode JSON Schema - エディタで補完とバリデーションが有効になります
+  "$schema": "https://opencode.ai/config.json",
+
+  // ========================================
+  // Instructions - AIに読み込ませるドキュメント
+  // ========================================
+  // プロジェクト固有のルールやガイドラインを指定
+  // AIはこれらのファイルを参照してコードを生成します
+  "instructions": [
+    "AGENTS.md", // 開発ガイド（コーディング規約、アーキテクチャパターン等）
+    "README.md", // プロジェクト概要
+  ],
+
+  // ========================================
+  // Agents - 特定タスク用の専門エージェント
+  // ========================================
+  // .claude/agents/mastra-docs.md で定義済みのエージェント
+  // JSONCでも設定を上書き・拡張可能
+  "agent": {
+    "mastra-docs": {
+      "description": "Mastraフレームワークのドキュメントを検索・確認します",
+      "model": "anthropic/claude-sonnet-4-5",
+      "tools": {
+        "webfetch": true,
+        "read": true,
+        "grep": true,
+        "glob": true,
+      },
+    },
+  },
+
+  // ========================================
+  // Commands - よく使うタスクをショートカット化
+  // ========================================
+  // 使い方: `/test`, `/typecheck` などでコマンド実行
+  "command": {
+    "test": {
+      "template": "Run all tests with Vitest and show results. Fix any failing tests.",
+      "description": "Run tests and fix failures",
+      "agent": "build", // ビルトインのbuildエージェントを使用
+    },
+    "typecheck": {
+      "template": "Run TypeScript type checking with `npm run typecheck` and fix any type errors.",
+      "description": "Type check and fix errors",
+      "agent": "build",
+    },
+    "lint": {
+      "template": "Run ESLint with `npm run lint` and fix any linting issues using `npm run lint:fix`.",
+      "description": "Lint and fix issues",
+      "agent": "build",
+    },
+    "commit": {
+      "template": "Create a commit following Conventional Commits specification. Use the smart-commit skill.",
+      "description": "Create a conventional commit",
+      "agent": "build",
+    },
+  },
+
+  // ========================================
+  // Formatter - コードフォーマッター設定
+  // ========================================
+  // AIがファイルを編集した後、自動的にフォーマットを適用
+  // PrettierはdevDependenciesにインストール済みなので直接実行可能
+  "formatter": {
+    "prettier": {
+      "command": ["prettier", "--write", "$FILE"],
+      "extensions": [".ts", ".js", ".json", ".jsonc", ".md"],
+    },
+  },
+
+  // ========================================
+  // Permissions - セキュリティ設定
+  // ========================================
+  // デフォルトでほとんどのツールは"allow"（自動承認）
+  // セキュリティ上重要な操作のみ明示的に制限
+  //
+  // 設定値:
+  //   "allow" - 承認なしで実行（デフォルト）
+  //   "ask"   - 実行前に確認
+  //   "deny"  - 実行をブロック
+  "permission": {
+    // 機密情報の保護
+    // .envファイルの読み取りを禁止（デフォルトでも設定されているが明示）
+    "read": {
+      "*": "allow",
+      "*.env": "deny", // 環境変数ファイル
+      "*.env.*": "deny", // 環境別設定（.env.production等）
+      "*.env.example": "allow", // サンプルファイルはOK
+      "**/.env": "deny", // サブディレクトリの.env
+      "**/.env.*": "deny", // サブディレクトリの環境別設定
+    },
+
+    // 危険なbashコマンドの制限
+    "bash": {
+      "*": "allow", // デフォルトは許可
+      "rm -rf /*": "deny", // ルートディレクトリの削除は禁止
+      "rm -rf ~/*": "deny", // ホームディレクトリの削除は禁止
+      "git push --force*": "ask", // 強制プッシュは確認
+      "git push -f*": "ask", // 強制プッシュ（短縮版）も確認
+      "npm publish*": "ask", // パッケージ公開は確認
+      "curl *|*bash*": "deny", // パイプ経由の実行は禁止
+      "wget *|*sh*": "deny", // パイプ経由の実行は禁止
+      "curl *|*sh*": "deny", // パイプ経由の実行は禁止
+    },
+
+    // プロジェクト外のディレクトリへのアクセスは確認
+    // （デフォルトで"ask"だが、セキュリティ上重要なので明示）
+    "external_directory": "ask",
+
+    // 同じツール呼び出しの無限ループ防止
+    // （デフォルトで"ask"だが明示）
+    "doom_loop": "ask",
+  },
+
+  // ========================================
+  // MCP Servers - Model Context Protocol サーバー
+  // ========================================
+  // 外部ツールとサービスを統合
+  // MCPツールはビルトインツールと一緒に自動的に利用可能になります
+  "mcp": {
+    // Mastra フレームワークのドキュメント検索
+    "mastra": {
+      "type": "local",
+      "command": ["npx", "-y", "@mastra/mcp-docs-server"],
+      "enabled": true,
+    },
+
+    // Chrome DevTools - ブラウザデバッグとインスペクション
+    "chrome-devtools": {
+      "type": "local",
+      "command": ["npx", "-y", "@modelcontextprotocol/server-puppeteer"],
+      "enabled": true,
+    },
+
+    // Context7 - 技術ドキュメント検索
+    // 無料で使用可能、APIキーを設定するとレート制限が緩和されます
+    "context7": {
+      "type": "remote",
+      "url": "https://mcp.context7.com/mcp",
+      "enabled": true,
+      // APIキーを使う場合は以下を追加:
+      // "headers": {
+      //   "CONTEXT7_API_KEY": "{env:CONTEXT7_API_KEY}"
+      // }
+    },
+  },
+
+  // ========================================
+  // Watcher - ファイル監視の除外設定
+  // ========================================
+  // これらのディレクトリ/ファイルは変更を監視しない
+  // パフォーマンス向上とノイズ削減のため
+  "watcher": {
+    "ignore": [
+      "node_modules/**", // npm packages
+      "dist/**", // ビルド成果物
+      ".git/**", // Git内部ファイル
+      "*.db", // LibSQLデータベース
+      "*.db-shm", // SQLite共有メモリ
+      "*.db-wal", // SQLite Write-Ahead Log
+      ".mastra/**", // Mastraフレームワーク内部
+      ".husky/**", // Git hooks
+    ],
+  },
+
+  // ========================================
+  // Auto-update - OpenCode自動更新
+  // ========================================
+  // 最新機能とバグフィックスを自動適用
+  "autoupdate": true,
+}

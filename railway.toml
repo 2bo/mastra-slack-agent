@@ -1,0 +1,11 @@
+# =============================================================================
+# Railway Configuration for Mastra Slack Agent
+# =============================================================================
+
+[build]
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 5

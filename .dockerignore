@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+.mastra/
+
+# Development files
+*.log
+npm-debug.log*
+.DS_Store
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# IDE/Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Git
+.git/
+.gitignore
+
+# Test files
+*.test.ts
+__tests__/
+coverage/
+
+# Documentation
+*.md
+!README.md
+docs/
+
+# Local database
+*.db
+*.db-wal
+*.db-shm

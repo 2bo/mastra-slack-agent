@@ -29,11 +29,13 @@ export const assistantAgent = new Agent({
   memory: new Memory({
     storage: new LibSQLStore({
       id: 'memory-store',
-      url: 'file:mastra.db',
+      url: process.env.TURSO_DATABASE_URL || 'file:mastra.db',
+      authToken: process.env.TURSO_AUTH_TOKEN,
     }),
     vector: new LibSQLVector({
       id: 'memory-vector',
-      url: 'file:mastra.db',
+      url: process.env.TURSO_DATABASE_URL || 'file:mastra.db',
+      authToken: process.env.TURSO_AUTH_TOKEN,
     }),
     embedder: openai.embedding('text-embedding-3-small'),
     options: {

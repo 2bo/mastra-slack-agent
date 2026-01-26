@@ -32,8 +32,10 @@ export const listEvents = createTool({
     timeMin: z.string().optional().describe('ISO string for start time. Defaults to now.'),
   }),
   execute: async (inputData) => {
+    console.log('[listEvents] Starting with input:', JSON.stringify(inputData));
     try {
       const calendar = getCalendarClient();
+      console.log('[listEvents] Calendar client initialized');
       const response = await calendar.events.list({
         calendarId: getCalendarId(),
         timeMin: inputData.timeMin || new Date().toISOString(),
@@ -57,6 +59,7 @@ export const listEvents = createTool({
         })),
       };
     } catch (error) {
+      console.error('[listEvents] Error:', error);
       return { error: error instanceof Error ? error.message : String(error) };
     }
   },

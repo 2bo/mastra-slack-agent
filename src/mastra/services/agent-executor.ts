@@ -20,6 +20,7 @@ type StreamIterator = AgentStreamOutput['fullStream'] | AsyncIterable<unknown>;
 async function handleStream(
   stream: StreamIterator,
   onStreamChunk?: StreamCallback,
+  context?: string,
 ): Promise<
   | string
   | {
@@ -32,20 +33,42 @@ async function handleStream(
     }
 > {
   let fullText = '';
+  const logPrefix = context ? `[handleStream:${context}]` : '[handleStream]';
 
-  // Use raw stream to iterate
+  console.log(`${logPrefix} Starting stream processing`);
+
+  // Store approval info if detected - we must consume the entire stream before returning
+  let approvalResult: {
+    type: 'approval-required';
+    agentName: string;
+    runId: string;
+    toolCallId: string;
+    toolName: string;
+    args: Record<string, unknown>;
+  } | null = null;
+
+  // Use raw stream to iterate - MUST consume entire stream for snapshot to be saved
   for await (const chunk of stream as AsyncIterable<unknown>) {
     const typedChunk = chunk as { type: string; runId?: string; payload?: Record<string, unknown> };
 
-    if (typedChunk.type === 'tool-call-approval') {
+    // Log all chunk types for debugging
+    console.log(
+      `${logPrefix} Chunk type: ${typedChunk.type}`,
+      typedChunk.runId ? `runId: ${typedChunk.runId}` : '',
+    );
+
+    if (typedChunk.type === 'tool-call-approval' && !approvalResult) {
       const payload = typedChunk.payload;
+      console.log(`${logPrefix} tool-call-approval payload:`, JSON.stringify(payload));
       if (
         payload &&
         typeof payload === 'object' &&
         'toolCallId' in payload &&
         'toolName' in payload
       ) {
-        return {
+        console.log(`${logPrefix} Detected approval-required for tool: ${payload['toolName']}`);
+        // Store the approval result but continue consuming the stream
+        approvalResult = {
           type: 'approval-required',
           agentName: 'unified',
           runId: typedChunk.runId || '',
@@ -54,6 +77,14 @@ async function handleStream(
           args: (payload['args'] as Record<string, unknown>) || {},
         };
       }
+    }
+
+    if (typedChunk.type === 'tool-call') {
+      console.log(`${logPrefix} tool-call:`, JSON.stringify(typedChunk.payload));
+    }
+
+    if (typedChunk.type === 'tool-result') {
+      console.log(`${logPrefix} tool-result:`, JSON.stringify(typedChunk.payload));
     }
 
     if (typedChunk.type === 'text-delta') {
@@ -66,6 +97,14 @@ async function handleStream(
         }
       }
     }
+  }
+
+  console.log(`${logPrefix} Stream completed. Full text length: ${fullText.length}`);
+
+  // Return approval result if one was detected during stream processing
+  if (approvalResult) {
+    console.log(`${logPrefix} Returning approval-required after stream completed`);
+    return approvalResult;
   }
 
   return fullText;
@@ -90,7 +129,7 @@ export const executeAgent = async (
       },
     });
 
-    const result = await handleStream(output.fullStream, onStreamChunk);
+    const result = await handleStream(output.fullStream, onStreamChunk, 'executeAgent');
 
     if (typeof result === 'object') {
       return result;
@@ -121,12 +160,13 @@ export const approveToolCall = async (
       toolCallId,
     });
 
-    const result = await handleStream(output.fullStream, onStreamChunk);
+    const result = await handleStream(output.fullStream, onStreamChunk, 'approveToolCall');
     if (typeof result === 'object') {
       // Approval shouldn't trigger another approval immediately in this simple agent,
       // but if it does, we treat it as done or recurse?
       // For now, assuming approval just returns text is safe for this specific agent structure.
       // But purely for type safety:
+      console.log('[approveToolCall] Unexpected nested approval:', JSON.stringify(result));
       return 'Unexpected nested approval request';
     }
 
@@ -152,9 +192,12 @@ export const declineToolCall = async (
       toolCallId,
     });
 
-    const result = await handleStream(output.fullStream, onStreamChunk);
+    const result = await handleStream(output.fullStream, onStreamChunk, 'declineToolCall');
     // Decline shouldn't trigger approval
-    if (typeof result === 'object') return 'Unexpected nested approval during decline';
+    if (typeof result === 'object') {
+      console.log('[declineToolCall] Unexpected nested approval:', JSON.stringify(result));
+      return 'Unexpected nested approval during decline';
+    }
 
     return result || 'No response.';
   } catch (error) {

@@ -1,10 +1,5 @@
 import 'dotenv/config';
 
-// But wait, 'src/mastra/index.ts' exports 'mastra'.
-// We don't have an initMastra/startMastra function there but 'mastra' instance.
-// We probably need to start the server or similar if needed, but for Bolt we just use the instance.
-// However, logging initialization might be good.
-
 import { initSlackApp, startSlackApp } from './slack/bolt-app';
 import { handleAction } from './slack/handlers/action-handler';
 import { handleMention } from './slack/handlers/mention-handler';

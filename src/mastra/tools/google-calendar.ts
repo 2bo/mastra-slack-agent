@@ -125,7 +125,7 @@ export const createEvent = createTool({
       .string()
       .describe('Start time in ISO format (e.g., 2025-12-15T10:00:00+09:00)'),
     endDateTime: z.string().describe('End time in ISO format (e.g., 2025-12-15T11:00:00+09:00)'),
-    description: z.string().optional().describe('Description of the event'),
+    description: z.string().nullish().describe('Description of the event'),
   }),
   execute: async (inputData) => {
     console.log('[DEBUG] createEvent called with inputData:', JSON.stringify(inputData, null, 2));

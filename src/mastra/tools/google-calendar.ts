@@ -31,7 +31,8 @@ export const listEvents = createTool({
     limit: z.number().optional().describe('Max number of events to return. Default 10.'),
     timeMin: z.string().optional().describe('ISO string for start time. Defaults to now.'),
   }),
-  execute: async (inputData) => {
+  execute: async (inputData, context) => {
+    console.log('[listEvents] user:', JSON.stringify(context?.requestContext?.get('user') ?? null));
     console.log('[listEvents] Starting with input:', JSON.stringify(inputData));
     try {
       const calendar = getCalendarClient();
@@ -80,7 +81,11 @@ export const searchEvents = createTool({
     timeMax: z.string().optional().describe('End of the search range in ISO format.'),
     limit: z.number().optional().describe('Max number of events to return. Default 10.'),
   }),
-  execute: async (inputData) => {
+  execute: async (inputData, context) => {
+    console.log(
+      '[searchEvents] user:',
+      JSON.stringify(context?.requestContext?.get('user') ?? null),
+    );
     try {
       const calendar = getCalendarClient();
       const response = await calendar.events.list({
@@ -127,7 +132,11 @@ export const createEvent = createTool({
     endDateTime: z.string().describe('End time in ISO format (e.g., 2025-12-15T11:00:00+09:00)'),
     description: z.string().optional().describe('Description of the event'),
   }),
-  execute: async (inputData) => {
+  execute: async (inputData, context) => {
+    console.log(
+      '[createEvent] user:',
+      JSON.stringify(context?.requestContext?.get('user') ?? null),
+    );
     console.log('[DEBUG] createEvent called with inputData:', JSON.stringify(inputData, null, 2));
     try {
       const calendar = getCalendarClient();

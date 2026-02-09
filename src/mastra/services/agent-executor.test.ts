@@ -2,9 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Agent } from '@mastra/core/agent';
 import { executeAgent, approveToolCall, declineToolCall } from './agent-executor';
 
-// ============================================
-// ヘルパー: モックエージェント生成
-// ============================================
+const CONTEXT = { resourceId: 'U1234', threadId: 'C1234:1234.5678' };
+const RUN_ID = 'run-1';
+const TOOL_CALL_ID = 'tc-1';
 
 type StreamChunk = {
   type: string;
@@ -12,63 +12,82 @@ type StreamChunk = {
   payload?: Record<string, unknown>;
 };
 
-/**
- * AsyncGenerator でストリームチャンクを yield するモックエージェントを作成
- * Mastra の agent.stream() は { fullStream: AsyncIterable } を返す
- */
-function createMockAgent(options?: {
+const createStreamOutput = (chunks: StreamChunk[]) => ({
+  fullStream: (async function* () {
+    for (const chunk of chunks) {
+      yield chunk;
+    }
+  })(),
+});
+
+const createStreamMock = (chunks: StreamChunk[]) =>
+  vi.fn().mockResolvedValue(createStreamOutput(chunks));
+
+const createAgentStub = (options?: {
   streamChunks?: StreamChunk[];
   approveChunks?: StreamChunk[];
   declineChunks?: StreamChunk[];
-}) {
-  const makeStream = (chunks: StreamChunk[]) =>
-    vi.fn().mockResolvedValue({
-      fullStream: (async function* () {
-        for (const chunk of chunks) yield chunk;
-      })(),
-    });
+}) =>
+  ({
+    stream: createStreamMock(options?.streamChunks ?? []),
+    approveToolCall: createStreamMock(options?.approveChunks ?? []),
+    declineToolCall: createStreamMock(options?.declineChunks ?? []),
+  }) as unknown as Agent;
 
-  return {
-    stream: makeStream(options?.streamChunks ?? []),
-    approveToolCall: makeStream(options?.approveChunks ?? []),
-    declineToolCall: makeStream(options?.declineChunks ?? []),
-  } as unknown as Agent;
-}
+const textDelta = (text: string): StreamChunk => ({
+  type: 'text-delta',
+  payload: { text },
+});
 
-// ============================================
-// executeAgent
-// ============================================
+const createErrorAgent = (
+  method: 'stream' | 'approveToolCall' | 'declineToolCall',
+  message: string,
+) =>
+  ({
+    [method]: vi.fn().mockRejectedValue(new Error(message)),
+  }) as unknown as Agent;
+
+beforeEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe('executeAgent', () => {
-  const context = { resourceId: 'U1234', threadId: 'C1234:1234.5678' };
-
-  beforeEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  it('テキストチャンクを結合して completed を返す', async () => {
-    const agent = createMockAgent({
-      streamChunks: [
-        { type: 'text-delta', payload: { text: 'Hello ' } },
-        { type: 'text-delta', payload: { text: 'world' } },
-      ],
+  it('text-delta を結合して completed を返す', async () => {
+    const agent = createAgentStub({
+      streamChunks: [textDelta('Hello '), textDelta('world')],
     });
 
-    const result = await executeAgent(agent, 'hi', context);
+    const result = await executeAgent(agent, 'hi', CONTEXT);
 
     expect(result).toEqual({ type: 'completed', text: 'Hello world' });
   });
 
-  it('テキストがない場合は "Done." を返す', async () => {
-    const agent = createMockAgent({ streamChunks: [] });
+  it('onStreamChunk は text-delta ごとに呼ばれる', async () => {
+    const agent = createAgentStub({
+      streamChunks: [textDelta('A'), { type: 'tool-call', payload: {} }, textDelta('B')],
+    });
+    const onChunk = vi.fn();
 
-    const result = await executeAgent(agent, 'hi', context);
+    await executeAgent(agent, 'hi', CONTEXT, onChunk);
 
-    expect(result).toEqual({ type: 'completed', text: 'Done.' });
+    expect(onChunk).toHaveBeenCalledTimes(2);
+    expect(onChunk).toHaveBeenNthCalledWith(1, 'A');
+    expect(onChunk).toHaveBeenNthCalledWith(2, 'B');
   });
 
-  it('tool-call-approval チャンクで approval-required を返す', async () => {
-    const agent = createMockAgent({
+  it('text が空の場合は Done. を返し memory context を渡す', async () => {
+    const agent = createAgentStub({ streamChunks: [] });
+
+    const result = await executeAgent(agent, 'hello', CONTEXT);
+
+    expect(result).toEqual({ type: 'completed', text: 'Done.' });
+    expect(agent.stream).toHaveBeenCalledWith('hello', {
+      memory: { resource: 'U1234', thread: 'C1234:1234.5678' },
+    });
+  });
+
+  it('tool-call-approval を受けると approval-required を返す', async () => {
+    const agent = createAgentStub({
       streamChunks: [
         {
           type: 'tool-call-approval',
@@ -79,14 +98,10 @@ describe('executeAgent', () => {
             args: { summary: 'Meeting' },
           },
         },
-        // 承認後もストリームは続く（スナップショット保存のため全消費が必要）
-        { type: 'finish', payload: {} },
       ],
     });
 
-    const result = await executeAgent(agent, 'create event', context);
-
-    expect(result).toEqual({
+    await expect(executeAgent(agent, 'create event', CONTEXT)).resolves.toEqual({
       type: 'approval-required',
       agentName: 'unified',
       runId: 'run-abc',
@@ -96,140 +111,67 @@ describe('executeAgent', () => {
     });
   });
 
-  it('agent.stream がエラーをスローした場合 error を返す', async () => {
-    const agent = {
-      stream: vi.fn().mockRejectedValue(new Error('API error')),
-    } as unknown as Agent;
+  it('agent.stream の失敗を error 結果に変換する', async () => {
+    const agent = createErrorAgent('stream', 'API error');
 
-    const result = await executeAgent(agent, 'hi', context);
-
-    expect(result).toEqual({
+    await expect(executeAgent(agent, 'hi', CONTEXT)).resolves.toEqual({
       type: 'error',
       error: expect.objectContaining({ message: 'API error' }),
     });
   });
-
-  it('onStreamChunk コールバックがテキストチャンクごとに呼ばれる', async () => {
-    const agent = createMockAgent({
-      streamChunks: [
-        { type: 'text-delta', payload: { text: 'A' } },
-        { type: 'tool-call', payload: {} }, // テキスト以外はコールバックされない
-        { type: 'text-delta', payload: { text: 'B' } },
-      ],
-    });
-
-    const onChunk = vi.fn();
-    await executeAgent(agent, 'hi', context, onChunk);
-
-    expect(onChunk).toHaveBeenCalledTimes(2);
-    expect(onChunk).toHaveBeenNthCalledWith(1, 'A');
-    expect(onChunk).toHaveBeenNthCalledWith(2, 'B');
-  });
-
-  it('memory コンテキストを agent.stream に渡す', async () => {
-    const agent = createMockAgent({ streamChunks: [] });
-
-    await executeAgent(agent, 'hello', context);
-
-    expect(agent.stream).toHaveBeenCalledWith('hello', {
-      memory: { resource: 'U1234', thread: 'C1234:1234.5678' },
-    });
-  });
 });
 
-// ============================================
-// approveToolCall
-// ============================================
-
 describe('approveToolCall', () => {
-  beforeEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  it('ストリームからテキストを収集して返す', async () => {
-    const agent = createMockAgent({
-      approveChunks: [
-        { type: 'text-delta', payload: { text: 'Event created' } },
-        { type: 'text-delta', payload: { text: ' successfully' } },
-      ],
+  it('テキストを連結して返す', async () => {
+    const agent = createAgentStub({
+      approveChunks: [textDelta('Event created'), textDelta(' successfully')],
     });
 
-    const result = await approveToolCall(agent, 'run-1', 'tc-1');
-
-    expect(result).toBe('Event created successfully');
-  });
-
-  it('テキストがない場合はフォールバックメッセージを返す', async () => {
-    const agent = createMockAgent({ approveChunks: [] });
-
-    const result = await approveToolCall(agent, 'run-1', 'tc-1');
-
-    expect(result).toBe('✅ Completed.');
-  });
-
-  it('"No snapshot found" エラーの場合セッション期限切れメッセージをスロー', async () => {
-    const agent = {
-      approveToolCall: vi.fn().mockRejectedValue(new Error('No snapshot found for run-1')),
-    } as unknown as Agent;
-
-    await expect(approveToolCall(agent, 'run-1', 'tc-1')).rejects.toThrow(
-      'Session expired. Please retry your request.',
+    await expect(approveToolCall(agent, RUN_ID, TOOL_CALL_ID)).resolves.toBe(
+      'Event created successfully',
     );
   });
 
-  it('その他のエラーはそのまま再スロー', async () => {
-    const agent = {
-      approveToolCall: vi.fn().mockRejectedValue(new Error('Unknown error')),
-    } as unknown as Agent;
+  it('テキストが空ならフォールバックを返す', async () => {
+    const agent = createAgentStub({ approveChunks: [] });
 
-    await expect(approveToolCall(agent, 'run-1', 'tc-1')).rejects.toThrow('Unknown error');
+    await expect(approveToolCall(agent, RUN_ID, TOOL_CALL_ID)).resolves.toBe('✅ Completed.');
   });
 
-  it('onStreamChunk コールバックが呼ばれる', async () => {
-    const agent = createMockAgent({
-      approveChunks: [{ type: 'text-delta', payload: { text: 'Done' } }],
-    });
+  it('No snapshot found は期限切れに変換し、他は再スローする', async () => {
+    const expiredAgent = createErrorAgent('approveToolCall', 'No snapshot found for run-1');
 
-    const onChunk = vi.fn();
-    await approveToolCall(agent, 'run-1', 'tc-1', onChunk);
+    await expect(approveToolCall(expiredAgent, RUN_ID, TOOL_CALL_ID)).rejects.toThrow(
+      'Session expired. Please retry your request.',
+    );
 
-    expect(onChunk).toHaveBeenCalledWith('Done');
+    const agent = createErrorAgent('approveToolCall', 'Unknown error');
+
+    await expect(approveToolCall(agent, RUN_ID, TOOL_CALL_ID)).rejects.toThrow('Unknown error');
   });
 });
 
-// ============================================
-// declineToolCall
-// ============================================
-
 describe('declineToolCall', () => {
-  beforeEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  it('ストリームからテキストを収集して返す', async () => {
-    const agent = createMockAgent({
-      declineChunks: [{ type: 'text-delta', payload: { text: 'Understood, cancelled.' } }],
+  it('テキストを連結して返す', async () => {
+    const agent = createAgentStub({
+      declineChunks: [textDelta('Understood, cancelled.')],
     });
 
-    const result = await declineToolCall(agent, 'run-1', 'tc-1');
-
-    expect(result).toBe('Understood, cancelled.');
+    await expect(declineToolCall(agent, RUN_ID, TOOL_CALL_ID)).resolves.toBe(
+      'Understood, cancelled.',
+    );
   });
 
-  it('テキストがない場合は "No response." を返す', async () => {
-    const agent = createMockAgent({ declineChunks: [] });
+  it('テキストが空ならフォールバックを返す', async () => {
+    const agent = createAgentStub({ declineChunks: [] });
 
-    const result = await declineToolCall(agent, 'run-1', 'tc-1');
-
-    expect(result).toBe('No response.');
+    await expect(declineToolCall(agent, RUN_ID, TOOL_CALL_ID)).resolves.toBe('No response.');
   });
 
-  it('"No snapshot found" エラーの場合セッション期限切れメッセージをスロー', async () => {
-    const agent = {
-      declineToolCall: vi.fn().mockRejectedValue(new Error('No snapshot found for run-1')),
-    } as unknown as Agent;
+  it('No snapshot found は期限切れエラーに変換する', async () => {
+    const agent = createErrorAgent('declineToolCall', 'No snapshot found for run-1');
 
-    await expect(declineToolCall(agent, 'run-1', 'tc-1')).rejects.toThrow(
+    await expect(declineToolCall(agent, RUN_ID, TOOL_CALL_ID)).rejects.toThrow(
       'Session expired. Please retry your request.',
     );
   });

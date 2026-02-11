@@ -10,7 +10,7 @@ export PATH="$LOCAL_BIN:$PATH"
 
 # インストール済みでなければインストール
 if ! command -v gh &>/dev/null; then
-  VERSION=$(curl -sL "https://api.github.com/repos/cli/cli/releases/latest" | sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p' | head -1)
+  VERSION=$(curl -sL "https://api.github.com/repos/cli/cli/releases/latest" | sed -n 's/.*"tag_name": *"v\([^"]*\)".*/\1/p' | head -1 || true)
   [[ -n "$VERSION" ]] || { echo "Failed to get gh version"; exit 1; }
 
   curl -sL "https://github.com/cli/cli/releases/download/v${VERSION}/gh_${VERSION}_linux_amd64.tar.gz" \

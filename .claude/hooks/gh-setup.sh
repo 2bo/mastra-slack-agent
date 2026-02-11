@@ -1,6 +1,17 @@
 #!/bin/bash
 set -eo pipefail
 
+# gh CLI auto-setup for Claude Code Web
+#
+# SessionStart hook で自動実行され、gh CLI のインストールと認証確認を行う。
+#
+# 前提条件:
+#   Claude Code Web の Secrets に GITHUB_TOKEN を登録しておくこと。
+#   1. https://github.com/settings/tokens で Personal Access Token を作成（repo スコープ）
+#   2. Claude Code Web の Settings → Secrets で GITHUB_TOKEN として登録
+#
+# ローカル環境では CLAUDE_CODE_REMOTE が未設定のため自動スキップされる。
+
 # Claude Code Web 環境でのみ実行
 [[ "$CLAUDE_CODE_REMOTE" == "true" ]] || exit 0
 

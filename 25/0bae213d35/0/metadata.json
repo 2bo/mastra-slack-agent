@@ -1,0 +1,40 @@
+{
+  "cli_version": "0.4.3",
+  "checkpoint_id": "250bae213d35",
+  "session_id": "f54c7733-2547-4eaf-8bdc-87e6169392a9",
+  "strategy": "manual-commit",
+  "created_at": "2026-02-12T15:09:34.035754Z",
+  "branch": "refactor/remove-deny-reason",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "src/index.ts",
+    "src/slack/constants.ts",
+    "src/slack/handlers/action-handler.ts",
+    "src/slack/handlers/index.ts",
+    "src/slack/handlers/view-handler.ts",
+    "src/slack/types/handler-args.ts",
+    "src/slack/ui/approval-blocks.test.ts",
+    "src/slack/ui/approval-blocks.ts",
+    "src/slack/utils/chat-stream.ts",
+    "src/slack/utils/metadata.test.ts",
+    "src/slack/utils/metadata.ts"
+  ],
+  "agent": "Claude Code",
+  "token_usage": {
+    "input_tokens": 59,
+    "cache_creation_tokens": 86679,
+    "cache_read_tokens": 2489675,
+    "output_tokens": 4924,
+    "api_call_count": 40
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-02-12T15:09:33.956242Z",
+    "agent_lines": 35,
+    "human_added": 74,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 109,
+    "agent_percentage": 32.11009174311927
+  },
+  "transcript_path": ".claude/projects/-Users-kota-workspace-github-com-kota-mastra-slack-agent/f54c7733-2547-4eaf-8bdc-87e6169392a9.jsonl"
+}

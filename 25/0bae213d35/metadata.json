@@ -1,0 +1,36 @@
+{
+  "cli_version": "0.4.3",
+  "checkpoint_id": "250bae213d35",
+  "strategy": "manual-commit",
+  "branch": "refactor/remove-deny-reason",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "src/index.ts",
+    "src/slack/constants.ts",
+    "src/slack/handlers/action-handler.ts",
+    "src/slack/handlers/index.ts",
+    "src/slack/handlers/view-handler.ts",
+    "src/slack/types/handler-args.ts",
+    "src/slack/ui/approval-blocks.test.ts",
+    "src/slack/ui/approval-blocks.ts",
+    "src/slack/utils/chat-stream.ts",
+    "src/slack/utils/metadata.test.ts",
+    "src/slack/utils/metadata.ts"
+  ],
+  "sessions": [
+    {
+      "metadata": "/25/0bae213d35/0/metadata.json",
+      "transcript": "/25/0bae213d35/0/full.jsonl",
+      "context": "/25/0bae213d35/0/context.md",
+      "content_hash": "/25/0bae213d35/0/content_hash.txt",
+      "prompt": "/25/0bae213d35/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 59,
+    "cache_creation_tokens": 86679,
+    "cache_read_tokens": 2489675,
+    "output_tokens": 4924,
+    "api_call_count": 40
+  }
+}

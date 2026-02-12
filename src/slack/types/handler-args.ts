@@ -35,4 +35,3 @@ export type MentionHandlerArgs = SlackEventMiddlewareArgs<'app_mention'> & {
 export type ActionHandlerArgs = SlackActionMiddlewareArgs<BlockAction> & {
   client: WebClient;
 };
-

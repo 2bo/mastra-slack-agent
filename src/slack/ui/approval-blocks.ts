@@ -1,9 +1,5 @@
 import { WebClient, KnownBlock } from '@slack/web-api';
-import {
-  buildActionId,
-  BUTTON_LABELS,
-  MESSAGES,
-} from '../constants';
+import { buildActionId, BUTTON_LABELS, MESSAGES } from '../constants';
 
 // tool-call-approval イベントの型
 export interface ToolCallApprovalPayload {

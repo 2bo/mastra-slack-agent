@@ -1,14 +1,9 @@
-import { WebClient, KnownBlock, ModalView } from '@slack/web-api';
+import { WebClient, KnownBlock } from '@slack/web-api';
 import {
   buildActionId,
   BUTTON_LABELS,
-  BLOCK_IDS,
-  INPUT_LABELS,
-  MODAL_TITLES,
   MESSAGES,
 } from '../constants';
-import type { ApprovalMetadata } from '../utils/metadata';
-import { serializeMetadata } from '../utils/metadata';
 
 // tool-call-approval イベントの型
 export interface ToolCallApprovalPayload {
@@ -82,34 +77,4 @@ export const updateApprovalMessage = async (
     text: `${emoji} ${text}`,
     blocks: [], // ボタン削除
   });
-};
-
-/**
- * 却下理由入力モーダルビューを構築
- */
-export const buildRejectionModal = (metadata: ApprovalMetadata): ModalView => {
-  return {
-    type: 'modal',
-    callback_id: buildActionId(
-      'REJECT_REASON',
-      metadata.agentName,
-      metadata.runId,
-      metadata.toolCallId,
-    ),
-    private_metadata: serializeMetadata(metadata),
-    title: { type: 'plain_text', text: MODAL_TITLES.REJECTION_REASON },
-    blocks: [
-      {
-        type: 'input',
-        block_id: BLOCK_IDS.REASON_BLOCK,
-        element: {
-          type: 'plain_text_input',
-          action_id: BLOCK_IDS.REASON_INPUT,
-          multiline: true,
-        },
-        label: { type: 'plain_text', text: INPUT_LABELS.REASON },
-      },
-    ],
-    submit: { type: 'plain_text', text: BUTTON_LABELS.SUBMIT },
-  };
 };

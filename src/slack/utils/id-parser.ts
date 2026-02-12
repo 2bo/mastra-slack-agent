@@ -55,5 +55,3 @@ const parseId = (id: string): ParsedActionId => {
  * Action ID を解析
  */
 export const parseActionId = parseId;
-
-export const parseCallbackId = parseId;

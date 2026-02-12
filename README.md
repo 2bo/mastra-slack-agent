@@ -176,13 +176,11 @@ src/
 │   ├── constants.ts           # Slack関連定数
 │   ├── handlers/
 │   │   ├── mention-handler.ts # メンションイベント処理
-│   │   ├── action-handler.ts  # ボタンアクション処理
-│   │   └── view-handler.ts    # モーダル送信処理
+│   │   └── action-handler.ts  # ボタンアクション処理
 │   ├── ui/
 │   │   └── approval-blocks.ts # 承認UIブロック
 │   └── utils/
 │       ├── chat-stream.ts     # ストリーミングチャット処理
-│       ├── metadata.ts        # Slackメタデータ管理
 │       ├── thread-id.ts       # スレッドID管理
 │       ├── id-parser.ts       # ID解析ユーティリティ
 │       └── error-handler.ts   # エラーハンドリング

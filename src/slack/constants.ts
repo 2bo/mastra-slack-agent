@@ -4,15 +4,6 @@
  */
 
 // ============================================
-// Slack Block Kit IDs
-// ============================================
-
-export const BLOCK_IDS = {
-  REASON_BLOCK: 'reason_block',
-  REASON_INPUT: 'reason_input',
-} as const;
-
-// ============================================
 // Action ID Formats
 // ============================================
 
@@ -21,7 +12,6 @@ export const ACTION_ID_DELIMITER = ':';
 export const ACTION_ID_PREFIXES = {
   APPROVE: 'approve',
   REJECT: 'reject',
-  REJECT_REASON: 'reject_reason',
 } as const;
 
 /**
@@ -62,18 +52,9 @@ export const MESSAGES = {
   REJECTED_TEXT: 'Rejected',
 } as const;
 
-export const MODAL_TITLES = {
-  REJECTION_REASON: 'Rejection Reason',
-} as const;
-
 export const BUTTON_LABELS = {
   APPROVE: 'Approve',
   REJECT: 'Reject',
-  SUBMIT: 'Submit',
-} as const;
-
-export const INPUT_LABELS = {
-  REASON: 'Please provide a reason or feedback:',
 } as const;
 
 // ============================================

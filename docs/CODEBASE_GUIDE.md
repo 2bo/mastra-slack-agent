@@ -64,7 +64,6 @@ src/
 │   ├── handlers/
 │   │   ├── mention-handler.ts
 │   │   ├── action-handler.ts
-│   │   ├── view-handler.ts
 │   │   └── index.ts
 │   ├── ui/
 │   │   ├── approval-blocks.ts
@@ -75,8 +74,6 @@ src/
 │       ├── chat-stream.ts
 │       ├── error-handler.ts
 │       ├── id-parser.ts
-│       ├── metadata.ts
-│       ├── metadata.test.ts
 │       ├── thread-id.ts
 │       └── thread-id.test.ts
 ├── scripts/
@@ -96,8 +93,7 @@ src/
 5. [src/mastra/agents/assistant-agent.ts](../src/mastra/agents/assistant-agent.ts)
 6. [src/mastra/tools/google-calendar.ts](../src/mastra/tools/google-calendar.ts)
 7. [src/slack/handlers/action-handler.ts](../src/slack/handlers/action-handler.ts)
-8. [src/slack/handlers/view-handler.ts](../src/slack/handlers/view-handler.ts)
-9. [src/slack/ui/approval-blocks.ts](../src/slack/ui/approval-blocks.ts)
+8. [src/slack/ui/approval-blocks.ts](../src/slack/ui/approval-blocks.ts)
 10. [docs/PROCESS_FLOW.md](./PROCESS_FLOW.md)
 
 ---
@@ -110,7 +106,6 @@ src/
 - `app.event('app_mention', handleMention)`
 - `app.action(/approve:.+/, handleAction)`
 - `app.action(/reject:.+/, handleAction)`
-- `app.view(/reject_reason:.+/, handleViewSubmission)`
 
 Slack 起動処理は [src/slack/bolt-app.ts](../src/slack/bolt-app.ts):
 - 必須 env (`SLACK_BOT_TOKEN`, `SLACK_SIGNING_SECRET`, 必要なら `SLACK_APP_TOKEN`) を検証
@@ -138,10 +133,7 @@ Slack 起動処理は [src/slack/bolt-app.ts](../src/slack/bolt-app.ts):
 その後:
 - `mention-handler` が承認 UI（Approve/Reject）をスレッドに投稿
 - Approve: `action-handler` -> `approveToolCall(...)`
-- Reject: `action-handler` -> モーダル表示 -> `view-handler` -> `declineToolCall(...)`
-
-補足:
-- 現在 `view-handler` 内の却下理由はログ出力のみで、`declineToolCall` には渡していません（Agent API 未対応コメントあり）。
+- Reject: `action-handler` -> `declineToolCall(...)`
 
 ---
 
@@ -216,19 +208,6 @@ Slack 起動処理は [src/slack/bolt-app.ts](../src/slack/bolt-app.ts):
 例:
 - `approve:unified:run-123:tc-456`
 - `reject:unified:run-123:tc-456`
-- `reject_reason:unified:run-123:tc-456`
-
-### 8.2 Modal metadata
-
-ファイル: [src/slack/utils/metadata.ts](../src/slack/utils/metadata.ts)
-
-`private_metadata` に以下を JSON で保持:
-- `agentName`
-- `runId`
-- `toolCallId`
-- `channelId`
-- `messageTs`
-- `threadTs?`
 
 ---
 
@@ -339,8 +318,6 @@ npm run start
   - Snapshot期限切れエラー変換
 - [src/slack/ui/approval-blocks.test.ts](../src/slack/ui/approval-blocks.test.ts)
   - 承認ボタンID生成
-  - reject modal metadata
-- [src/slack/utils/metadata.test.ts](../src/slack/utils/metadata.test.ts)
 - [src/slack/utils/thread-id.test.ts](../src/slack/utils/thread-id.test.ts)
 - [src/mastra/tools/google-calendar.test.ts](../src/mastra/tools/google-calendar.test.ts)
 
@@ -368,6 +345,6 @@ npm run start
 
 ## 15. 注意点（現実装ベース）
 
-- `action-handler.ts` / `view-handler.ts` では `parseActionId` / `parseCallbackId` の失敗を `IdParseError` で明示的に扱っています。
+- `action-handler.ts` では `parseActionId` の失敗を `IdParseError` で明示的に扱っています。
 - `mention-handler.ts` の `updateMessageForResult` で、完了時は最初の `Processing...` メッセージを削除してスレッドを整理します。
 - `chat-stream.ts` は Slack ネイティブの stream API ではなく、`postMessage` + `update` による擬似ストリーミング実装です。

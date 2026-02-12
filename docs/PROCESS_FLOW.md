@@ -8,7 +8,7 @@
 ```mermaid
 flowchart TD
   A[Process Start<br/>src/index.ts] --> B[initSlackApp<br/>src/slack/bolt-app.ts]
-  B --> C[Register Handlers<br/>app_mention / approve / reject / view_submission]
+  B --> C[Register Handlers<br/>app_mention / approve / reject]
   C --> D[startSlackApp]
   D --> E[Slack Bolt Running<br/>Socket Mode or Events API]
   E --> F[Wait for Slack Events]
@@ -20,8 +20,7 @@ flowchart TD
 2. 以下のハンドラーを登録します。
 3. `app_mention` -> `handleMention`
 4. `approve:*` / `reject:*` -> `handleAction`
-5. `reject_reason:*` (modal submit) -> `handleViewSubmission`
-6. `startSlackApp()` で待ち受けを開始し、以降は Slack イベント駆動で処理が進みます。
+5. `startSlackApp()` で待ち受けを開始し、以降は Slack イベント駆動で処理が進みます。
 
 ## 2. 通常のメンション応答フロー
 
@@ -80,11 +79,10 @@ flowchart TD
   H --> I[approveToolCall + streamToSlack]
   I --> J[ツール実行再開 -> 最終応答を表示]
 
-  F -->|Reject| K[action-handler opens modal]
-  K --> L[view-handler]
-  L --> M[updateApprovalMessage: Rejected]
-  M --> N[declineToolCall + stream result]
-  N --> O[拒否後の最終応答を表示]
+  F -->|Reject| K[action-handler]
+  K --> L[updateApprovalMessage: Rejected]
+  L --> M[declineToolCall + streamToSlack]
+  M --> N[拒否後の最終応答を表示]
 ```
 
 ### 解説
@@ -93,7 +91,7 @@ flowchart TD
 2. `agent-executor` は `tool-call-approval` を検知し、`runId` / `toolCallId` を保持して Slack 層へ返します。
 3. `approval-blocks.ts` が Block Kit ボタンを生成し、承認依頼メッセージを投稿します。
 4. Approve の場合は `approveToolCall(runId, toolCallId)` で再開し、結果をストリーミング表示します。
-5. Reject の場合はモーダル入力後 `declineToolCall(runId, toolCallId)` を実行し、拒否後の応答を表示します。
+5. Reject の場合は `declineToolCall(runId, toolCallId)` を実行し、拒否後の応答をストリーミング表示します。
 
 ## 4. レイヤー責務（実装上の分離）
 
@@ -106,7 +104,7 @@ flowchart LR
 
 ### 解説
 
-1. Slack Layer はイベント受信・UI更新（投稿/更新/モーダル）だけを担当します。
+1. Slack Layer はイベント受信・UI更新（投稿/更新）だけを担当します。
 2. Service Layer はストリーム解釈と `tool-call-approval` 検知を担当します。
 3. Mastra Layer は LLM 推論・メモリ・ツール実行（Calendar API）を担当します。
 
@@ -115,7 +113,6 @@ flowchart LR
 - `src/index.ts`: 初期化とハンドラー登録
 - `src/slack/handlers/mention-handler.ts`: メンション受信と通常フロー起点
 - `src/slack/handlers/action-handler.ts`: Approve/Reject ボタン処理
-- `src/slack/handlers/view-handler.ts`: Reject モーダル送信処理
 - `src/slack/utils/chat-stream.ts`: Slack 表示のストリーミング制御
 - `src/mastra/services/agent-executor.ts`: Agent stream 処理と承認イベント検知
 - `src/mastra/agents/assistant-agent.ts`: モデル・メモリ・ツール構成

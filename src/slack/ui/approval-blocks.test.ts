@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { WebClient } from '@slack/web-api';
 import {
   buildApprovalBlocks,
-  buildRejectionModal,
   postApprovalRequest,
   updateApprovalMessage,
   ToolCallApprovalPayload,
@@ -15,15 +14,6 @@ const SAMPLE_PAYLOAD: ToolCallApprovalPayload = {
   toolCallId: 'tc-456',
   toolName: 'createEvent',
   args: { summary: 'Meeting', startDateTime: '2025-01-01T10:00:00Z' },
-};
-
-const SAMPLE_METADATA = {
-  agentName: 'assistant',
-  runId: 'run-123',
-  toolCallId: 'tc-456',
-  channelId: 'C1234',
-  messageTs: '1234.5678',
-  threadTs: '1234.0000',
 };
 
 const createMockClient = () =>
@@ -46,18 +36,6 @@ describe('buildApprovalBlocks', () => {
     const actions = blocks[1] as { type: string; elements: Array<{ action_id: string }> };
     expect(actions.elements[0].action_id).toBe('approve:assistant:run-123:tc-456');
     expect(actions.elements[1].action_id).toBe('reject:assistant:run-123:tc-456');
-  });
-});
-
-describe('buildRejectionModal', () => {
-  it('callback/private_metadata/input を含む modal を構築する', () => {
-    const modal = buildRejectionModal(SAMPLE_METADATA);
-    const privateMetadata = JSON.parse(modal.private_metadata ?? '{}') as Record<string, string>;
-
-    expect(modal.type).toBe('modal');
-    expect(modal.callback_id).toBe('reject_reason:assistant:run-123:tc-456');
-    expect(privateMetadata.channelId).toBe('C1234');
-    expect(modal.blocks).toHaveLength(1);
   });
 });
 

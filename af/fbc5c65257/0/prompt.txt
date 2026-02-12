@@ -1,0 +1,62 @@
+deny reasonっていま特に機能してないよね？？
+
+---
+
+A
+
+---
+
+ブランチきってコミットして prつくって
+
+---
+
+ん？なんか差分のこってない？？
+
+---
+
+entireってどうさした？？
+
+---
+
+checkpointブランチってpushされてる？？
+
+---
+
+ん？chatgptには
+基本は 手動で entire/checkpoints/v1 を push しなくてOK。
+Entire CLI が あなたが git push したタイミングで、チェックポイント用ブランチも一緒に（自動で）pushする設計です。
+
+どういうときに entire/checkpoints/v1 がpushされる？
+通常（デフォルト）
+
+あなたが普段どおり git push する
+
+そのとき Entire が「このpushをセッションに紐付ける？」みたいに促し、OKすると
+
+チェックポイントのメタデータを entire/checkpoints/v1 に書いて、そのブランチもpushされる
+
+逆に「pushされない」ケース
+
+そもそも git push してない（ローカルにしかない）
+
+設定で 自動pushを無効化している
+CLIに --skip-push-sessions（= git push 時のセッションログ自動pushを無効化）がある
+
+manual-commit と push の関係
+
+strategy: manual-commit は **「作業ブランチに自動コミットを増やさない」**の話で、
+entire/checkpoints/v1 をpushするかどうかとは別軸です。
+manual-commitでも、git push 時にチェックポイントブランチ側は通常 push されます。
+
+いま自分のrepoで確認するなら
+
+ローカル：git branch -a | grep entire
+
+リモート：GitHubで entire/checkpoints/v1 ブランチが増えてるか確認
+
+もし「pushしたのにブランチができない/増えない」なら、貼ってほしいのは entire status（あれば）や entire doctor の出力か、settings.json の該当部分（skip-push-sessions 付近）だけでOK。
+っていわれたけど？？
+
+---
+
+一旦masterからブランチ切り直して、別の対応として直して

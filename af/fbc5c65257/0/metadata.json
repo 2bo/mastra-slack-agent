@@ -1,0 +1,48 @@
+{
+  "cli_version": "0.4.3",
+  "checkpoint_id": "affbc5c65257",
+  "session_id": "af130a8b-3293-4317-92f4-a639d791bc87",
+  "strategy": "manual-commit",
+  "created_at": "2026-02-12T14:48:32.298384Z",
+  "branch": "fix/entire-husky-hooks-integration",
+  "checkpoints_count": 3,
+  "files_touched": [
+    ".husky/commit-msg",
+    ".husky/post-commit",
+    ".husky/pre-push",
+    ".husky/prepare-commit-msg",
+    "README.md",
+    "docs/CODEBASE_GUIDE.md",
+    "docs/PROCESS_FLOW.md",
+    "src/index.ts",
+    "src/slack/constants.ts",
+    "src/slack/handlers/action-handler.ts",
+    "src/slack/handlers/index.ts",
+    "src/slack/handlers/view-handler.ts",
+    "src/slack/types/handler-args.ts",
+    "src/slack/ui/approval-blocks.test.ts",
+    "src/slack/ui/approval-blocks.ts",
+    "src/slack/utils/id-parser.ts",
+    "src/slack/utils/metadata.test.ts",
+    "src/slack/utils/metadata.ts"
+  ],
+  "agent": "Claude Code",
+  "transcript_identifier_at_start": "404c0cff-8094-4c65-829d-4e11832c0ed6",
+  "token_usage": {
+    "input_tokens": 132,
+    "cache_creation_tokens": 125409,
+    "cache_read_tokens": 10105161,
+    "output_tokens": 6781,
+    "api_call_count": 116
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-02-12T14:48:32.149952Z",
+    "agent_lines": 12,
+    "human_added": 453,
+    "human_modified": 40,
+    "human_removed": 0,
+    "total_committed": 505,
+    "agent_percentage": 2.376237623762376
+  },
+  "transcript_path": ".claude/projects/-Users-kota-workspace-github-com-kota-mastra-slack-agent/af130a8b-3293-4317-92f4-a639d791bc87.jsonl"
+}

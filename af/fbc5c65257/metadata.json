@@ -1,0 +1,43 @@
+{
+  "cli_version": "0.4.3",
+  "checkpoint_id": "affbc5c65257",
+  "strategy": "manual-commit",
+  "branch": "fix/entire-husky-hooks-integration",
+  "checkpoints_count": 3,
+  "files_touched": [
+    ".husky/commit-msg",
+    ".husky/post-commit",
+    ".husky/pre-push",
+    ".husky/prepare-commit-msg",
+    "README.md",
+    "docs/CODEBASE_GUIDE.md",
+    "docs/PROCESS_FLOW.md",
+    "src/index.ts",
+    "src/slack/constants.ts",
+    "src/slack/handlers/action-handler.ts",
+    "src/slack/handlers/index.ts",
+    "src/slack/handlers/view-handler.ts",
+    "src/slack/types/handler-args.ts",
+    "src/slack/ui/approval-blocks.test.ts",
+    "src/slack/ui/approval-blocks.ts",
+    "src/slack/utils/id-parser.ts",
+    "src/slack/utils/metadata.test.ts",
+    "src/slack/utils/metadata.ts"
+  ],
+  "sessions": [
+    {
+      "metadata": "/af/fbc5c65257/0/metadata.json",
+      "transcript": "/af/fbc5c65257/0/full.jsonl",
+      "context": "/af/fbc5c65257/0/context.md",
+      "content_hash": "/af/fbc5c65257/0/content_hash.txt",
+      "prompt": "/af/fbc5c65257/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 132,
+    "cache_creation_tokens": 125409,
+    "cache_read_tokens": 10105161,
+    "output_tokens": 6781,
+    "api_call_count": 116
+  }
+}

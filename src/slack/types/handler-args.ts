@@ -3,8 +3,6 @@ import {
   SayFn,
   SlackActionMiddlewareArgs,
   SlackEventMiddlewareArgs,
-  SlackViewMiddlewareArgs,
-  ViewSubmitAction,
 } from '@slack/bolt';
 import { WebClient } from '@slack/web-api';
 
@@ -35,20 +33,5 @@ export type MentionHandlerArgs = SlackEventMiddlewareArgs<'app_mention'> & {
  * ```
  */
 export type ActionHandlerArgs = SlackActionMiddlewareArgs<BlockAction> & {
-  client: WebClient;
-};
-
-/**
- * モーダル送信ハンドラーの引数型
- *
- * @example
- * ```typescript
- * export const handleViewSubmission = async ({ ack, view, client }: ViewHandlerArgs) => {
- *   await ack();
- *   const value = view.state.values.block_id.input_id.value;
- * };
- * ```
- */
-export type ViewHandlerArgs = SlackViewMiddlewareArgs<ViewSubmitAction> & {
   client: WebClient;
 };

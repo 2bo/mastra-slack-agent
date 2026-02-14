@@ -65,6 +65,7 @@ export const streamToSlack = async (
   executor: (onChunk: (text: string) => Promise<void>) => Promise<string | { type: string }>,
   teamId?: string,
   userId?: string,
+  finalPrefix?: string,
 ) => {
   const streamResponse = await chatClient.startStream({
     channel,
@@ -96,11 +97,12 @@ export const streamToSlack = async (
       // Usually valid agent stream result matches accumulation.
       // However, let's ensure we flush the latest available text.
       const finalText = typeof result === 'string' ? result : fullText;
+      const prefixedText = finalPrefix ? `${finalPrefix}${finalText}` : finalText;
 
       await chatClient.stopStream({
         channel,
         ts: streamTs,
-        markdown_text: finalText,
+        markdown_text: prefixedText,
       });
     }
 

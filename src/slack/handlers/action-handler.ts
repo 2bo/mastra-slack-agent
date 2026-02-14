@@ -1,8 +1,8 @@
 import { mastra } from '../../mastra';
-import { approveToolCall } from '../../mastra/services/agent-executor';
-import { LOG_PREFIXES } from '../constants';
+import { approveToolCall, declineToolCall } from '../../mastra/services/agent-executor';
+import { LOG_PREFIXES, MESSAGES } from '../constants';
 import { ActionHandlerArgs } from '../types/handler-args';
-import { buildRejectionModal, updateApprovalMessage } from '../ui/approval-blocks';
+import { updateApprovalMessage } from '../ui/approval-blocks';
 import { getChatStreamClient, streamToSlack } from '../utils/chat-stream';
 import { handleError } from '../utils/error-handler';
 import { IdParseError, parseActionId } from '../utils/id-parser';
@@ -26,7 +26,7 @@ export const handleAction = async ({ action, ack, body, client }: ActionHandlerA
 
   if (!body.channel || !body.message) return;
 
-  const { type, agentName, runId, toolCallId } = parsed;
+  const { type, runId, toolCallId } = parsed;
   const { channel, message } = body;
   const chatClient = getChatStreamClient(client);
 
@@ -60,20 +60,34 @@ export const handleAction = async ({ action, ack, body, client }: ActionHandlerA
       });
     }
   } else if (type === 'reject') {
+    await updateApprovalMessage(client, channel.id, message.ts, 'rejected');
     try {
-      await client.views.open({
-        trigger_id: body.trigger_id,
-        view: buildRejectionModal({
-          agentName,
-          runId,
-          toolCallId,
-          channelId: channel.id,
-          messageTs: message.ts,
-          threadTs: message.thread_ts,
-        }),
-      });
+      await streamToSlack(
+        chatClient,
+        channel.id,
+        message.thread_ts,
+
+        async (onChunk: (text: string) => Promise<void>) => {
+          return await declineToolCall(
+            mastra.getAgent('assistantAgent'),
+            runId,
+            toolCallId,
+            onChunk,
+          );
+        },
+        'team' in body && body.team ? body.team.id : undefined,
+        'user' in body && body.user ? body.user.id : undefined,
+        MESSAGES.REJECTED_PREFIX,
+      );
     } catch (error) {
-      console.error(`${LOG_PREFIXES.ACTION_HANDLER} Error opening modal:`, error);
+      await handleError({
+        logPrefix: LOG_PREFIXES.ACTION_HANDLER,
+        logMessage: 'Error declining tool call',
+        error,
+        client,
+        channel: channel.id,
+        threadTs: message.thread_ts,
+      });
     }
   } else {
     console.error(`${LOG_PREFIXES.ACTION_HANDLER} Unknown action type: ${type}`);

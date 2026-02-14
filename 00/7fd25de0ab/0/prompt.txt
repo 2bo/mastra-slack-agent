@@ -336,3 +336,48 @@ git commit -m "refactor(api): extract error handler"
 - ユーザーがコミットを作成したい時
 - "commit" や "コミット" という単語を含むリクエスト
 - git の変更をレビューする時
+
+---
+
+y
+
+---
+
+メンションに反応しない
+
+---
+
+設定買えたあとって、inviteのし直し必要？？
+
+---
+
+んーやったけど反応しない
+
+---
+
+$ npm run dev:slack
+
+> mastra-slack-agent@1.0.0 dev:slack
+> tsx --watch src/index.ts
+
+Starting Mastra Slack Agent...
+⚡️ Slack Bolt app is running in Socket Mode!
+🚀 Application is ready!
+しかでてない
+
+---
+
+表示されない
+
+---
+
+inviteはしたよ
+
+---
+
+@mastra-dev hello     ← これなら OK（1つのメッセージ）
+になってる
+
+---
+
+うごいた！

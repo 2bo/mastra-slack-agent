@@ -110,3 +110,48 @@ git diff --staged
 
 - ステージングされた変更を確�...
 
+### Prompt 18
+
+y
+
+### Prompt 19
+
+メンションに反応しない
+
+### Prompt 20
+
+設定買えたあとって、inviteのし直し必要？？
+
+### Prompt 21
+
+んーやったけど反応しない
+
+### Prompt 22
+
+$ npm run dev:slack
+
+> mastra-slack-agent@1.0.0 dev:slack
+> tsx --watch src/index.ts
+
+Starting Mastra Slack Agent...
+⚡️ Slack Bolt app is running in Socket Mode!
+🚀 Application is ready!
+しかでてない
+
+### Prompt 23
+
+表示されない
+
+### Prompt 24
+
+inviteはしたよ
+
+### Prompt 25
+
+@mastra-dev hello     ← これなら OK（1つのメッセージ）
+になってる
+
+### Prompt 26
+
+うごいた！
+

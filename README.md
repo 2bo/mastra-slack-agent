@@ -47,9 +47,15 @@ Google Calendar API
    - `app_mentions:read` - メンションの受信
    - `chat:write` - メッセージ送信
    - `channels:history` - チャンネル履歴の読み取り
-3. **Event Subscriptions** を有効化し、`app_mention` イベントをサブスクライブ
+3. **Event Subscriptions** を有効化し、`app_mention` イベントをサブスクライブ:
+   - 左メニュー **Event Subscriptions** → **Enable Events** を ON
+   - **Subscribe to bot events** → **Add Bot User Event** → `app_mention` を追加
+   - 右下の **Save Changes** をクリック
 4. **Socket Mode** を有効化（開発環境推奨）:
-   - App-Level Token を生成（スコープ: `connections:write`）
+   - 左メニュー **Socket Mode** → **Enable Socket Mode** を ON にする
+   - App-Level Token の生成ダイアログが表示される（表示されない場合は **Basic Information** → **App-Level Tokens** → **Generate Token and Scopes** から生成）
+   - Token Name を入力（例: `socket-token`）し、スコープに `connections:write` を追加
+   - **Generate** をクリックし、表示される `xapp-` で始まるトークンを `.env` の `SLACK_APP_TOKEN` に設定
 5. アプリをワークスペースにインストール
 
 ## セットアップ手順 (Setup Steps)

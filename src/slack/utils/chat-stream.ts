@@ -9,7 +9,7 @@ export type ChatStreamClient = {
   update: (args: { channel: string; ts: string; text: string }) => Promise<void>;
   startStream: (args: {
     channel: string;
-    thread_ts?: string;
+    thread_ts: string;
     recipient_team_id?: string;
     recipient_user_id?: string;
   }) => Promise<{ ts?: string }>;
@@ -27,33 +27,14 @@ export const getChatStreamClient = (client: WebClient): ChatStreamClient => {
       await client.chat.update(args);
     },
     startStream: async (args) => {
-      // Start by posting an initial message (placeholder)
-      const result = await client.chat.postMessage({
-        channel: args.channel,
-        thread_ts: args.thread_ts,
-        text: '...', // Initial placeholder
-        // Pass team/user if supported by types, otherwise ignoring for now to be safe
-        // (Shared channel support might require these, but type definition might limit us)
-      });
+      const result = await client.chat.startStream(args);
       return { ts: result.ts };
     },
     appendStream: async (args) => {
-      // Update the message with new content
-      await client.chat.update({
-        channel: args.channel,
-        ts: args.ts,
-        text: args.markdown_text,
-      });
+      await client.chat.appendStream(args);
     },
     stopStream: async (args) => {
-      // Final update if needed
-      if (args.markdown_text) {
-        await client.chat.update({
-          channel: args.channel,
-          ts: args.ts,
-          text: args.markdown_text,
-        });
-      }
+      await client.chat.stopStream(args);
     },
   };
 };
@@ -61,7 +42,7 @@ export const getChatStreamClient = (client: WebClient): ChatStreamClient => {
 export const streamToSlack = async (
   chatClient: ChatStreamClient,
   channel: string,
-  threadTs: string | undefined,
+  threadTs: string,
   executor: (onChunk: (text: string) => Promise<void>) => Promise<string | { type: string }>,
   teamId?: string,
   userId?: string,
@@ -76,33 +57,36 @@ export const streamToSlack = async (
 
   const streamTs = streamResponse.ts;
   let streamOpen = true;
-  let fullText = '';
+  let streamedText = '';
 
   try {
     const result = await executor(async (chunk: string) => {
       if (streamOpen && streamTs) {
-        fullText += chunk;
+        const textToAppend = streamedText === '' && finalPrefix ? `${finalPrefix}${chunk}` : chunk;
+        streamedText += textToAppend;
         await chatClient.appendStream({
           channel,
           ts: streamTs,
-          markdown_text: fullText,
+          markdown_text: textToAppend,
         });
       }
     });
 
     streamOpen = false;
     if (streamTs) {
-      // If result is string, it might be the final full text.
-      // But we have been accumulating in fullText.
-      // Usually valid agent stream result matches accumulation.
-      // However, let's ensure we flush the latest available text.
-      const finalText = typeof result === 'string' ? result : fullText;
-      const prefixedText = finalPrefix ? `${finalPrefix}${finalText}` : finalText;
-
+      let finalAppendText: string | undefined;
+      if (typeof result === 'string') {
+        const expectedFinalText = finalPrefix ? `${finalPrefix}${result}` : result;
+        if (streamedText !== expectedFinalText) {
+          finalAppendText = expectedFinalText.startsWith(streamedText)
+            ? expectedFinalText.slice(streamedText.length)
+            : expectedFinalText;
+        }
+      }
       await chatClient.stopStream({
         channel,
         ts: streamTs,
-        markdown_text: prefixedText,
+        markdown_text: finalAppendText,
       });
     }
 
@@ -110,12 +94,9 @@ export const streamToSlack = async (
   } catch (error) {
     streamOpen = false;
     if (streamTs) {
-      // Optionally update message to show error?
-      // Current interface stopStream just closes.
       await chatClient.stopStream({
         channel,
         ts: streamTs,
-        // markdown_text: `Error: ${error instanceof Error ? error.message : String(error)}` // optional
       });
     }
     throw error;

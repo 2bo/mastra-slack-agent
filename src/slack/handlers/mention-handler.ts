@@ -31,8 +31,8 @@ export const handleMention = async ({ event, say, client }: MentionHandlerArgs) 
     return;
   }
 
-  // 親メッセージ投稿（ストリーミングのスレッド起点）
-  const { ts: parentTs } = await chatClient.postMessage({
+  // スレッド内に進捗メッセージを投稿（未スレッドの場合はこれでスレッド開始）
+  const { ts: processingMessageTs } = await chatClient.postMessage({
     channel,
     thread_ts: thread_ts || ts,
     text: MESSAGES.PROCESSING,
@@ -43,7 +43,7 @@ export const handleMention = async ({ event, say, client }: MentionHandlerArgs) 
     const result = await streamToSlack(
       chatClient,
       channel,
-      parentTs ?? ts,
+      processingMessageTs ?? ts,
       async (onChunk: (text: string) => Promise<void>) => {
         return await executeAgent(
           mastra.getAgent('assistantAgent'),
@@ -66,7 +66,7 @@ export const handleMention = async ({ event, say, client }: MentionHandlerArgs) 
       client,
       chatClient,
       channel,
-      messageTs: parentTs ?? ts,
+      messageTs: processingMessageTs ?? ts,
       threadTs: thread_ts || ts, // Original logic passed this to updateMessage
       agentName: 'unified',
     });
@@ -78,7 +78,7 @@ export const handleMention = async ({ event, say, client }: MentionHandlerArgs) 
       error,
       client,
       channel,
-      messageTs: parentTs ?? ts,
+      messageTs: processingMessageTs ?? ts,
     });
   }
 };
@@ -117,7 +117,7 @@ async function updateMessageForResult(params: {
 
     case 'completed':
       // ストリーミング完了 - 既にstopStreamでメッセージは表示済み
-      // 親メッセージ（「処理中...」）を削除してスレッドをクリーンに
+      // 進捗メッセージ（「処理中...」）を削除してスレッドをクリーンに
       await client.chat.delete({
         channel,
         ts: messageTs,

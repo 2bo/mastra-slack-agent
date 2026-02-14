@@ -36,7 +36,7 @@ export const handleAction = async ({ action, ack, body, client }: ActionHandlerA
       await streamToSlack(
         chatClient,
         channel.id,
-        message.thread_ts,
+        message.thread_ts ?? message.ts,
 
         async (onChunk: (text: string) => Promise<void>) => {
           return await approveToolCall(
@@ -65,7 +65,7 @@ export const handleAction = async ({ action, ack, body, client }: ActionHandlerA
       await streamToSlack(
         chatClient,
         channel.id,
-        message.thread_ts,
+        message.thread_ts ?? message.ts,
 
         async (onChunk: (text: string) => Promise<void>) => {
           return await declineToolCall(

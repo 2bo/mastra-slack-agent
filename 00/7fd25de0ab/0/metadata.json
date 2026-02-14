@@ -1,0 +1,32 @@
+{
+  "cli_version": "0.4.3",
+  "checkpoint_id": "007fd25de0ab",
+  "session_id": "732c788b-b728-4d1b-887a-798caa5475d7",
+  "strategy": "manual-commit",
+  "created_at": "2026-02-14T15:38:40.533982Z",
+  "branch": "main",
+  "checkpoints_count": 2,
+  "files_touched": [
+    "README.md",
+    "src/index.ts"
+  ],
+  "agent": "Claude Code",
+  "transcript_identifier_at_start": "5d903ec5-2256-41fe-963b-c9858b9c136b",
+  "token_usage": {
+    "input_tokens": 63,
+    "cache_creation_tokens": 60705,
+    "cache_read_tokens": 1579165,
+    "output_tokens": 311,
+    "api_call_count": 31
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-02-14T15:38:40.478516Z",
+    "agent_lines": 0,
+    "human_added": 53,
+    "human_modified": 49,
+    "human_removed": 0,
+    "total_committed": 64,
+    "agent_percentage": 0
+  },
+  "transcript_path": ".claude/projects/-Users-kota-workspace-github-com-kota-mastra-slack-agent/732c788b-b728-4d1b-887a-798caa5475d7.jsonl"
+}

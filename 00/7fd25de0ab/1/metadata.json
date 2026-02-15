@@ -1,0 +1,32 @@
+{
+  "cli_version": "0.4.3",
+  "checkpoint_id": "007fd25de0ab",
+  "session_id": "caee31bb-3608-48d4-9b5b-fba07e5dc424",
+  "strategy": "manual-commit",
+  "created_at": "2026-02-15T09:26:46.891761Z",
+  "branch": "feat/observational-memory",
+  "checkpoints_count": 5,
+  "files_touched": [
+    "package.json",
+    "src/mastra/agents/assistant-agent.ts"
+  ],
+  "agent": "Claude Code",
+  "transcript_identifier_at_start": "f8042188-9146-4fef-9474-1e664223443b",
+  "token_usage": {
+    "input_tokens": 64,
+    "cache_creation_tokens": 76090,
+    "cache_read_tokens": 2577129,
+    "output_tokens": 1362,
+    "api_call_count": 42
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-02-15T09:26:46.693903Z",
+    "agent_lines": 0,
+    "human_added": 1661,
+    "human_modified": 13,
+    "human_removed": 0,
+    "total_committed": 1670,
+    "agent_percentage": 0
+  },
+  "transcript_path": ".claude/projects/-Users-kota-workspace-github-com-kota-mastra-slack-agent/caee31bb-3608-48d4-9b5b-fba07e5dc424.jsonl"
+}

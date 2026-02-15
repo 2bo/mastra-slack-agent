@@ -1,0 +1,52 @@
+mastraのメモリっていまなにが有効になってる？？
+
+---
+
+現状の目的を鑑みるとlastMessagesだけでいいきがする
+
+---
+
+https://mastra.ai/docs/memory/observational-memory をつかってみたい
+
+---
+
+mastra自体アップデートして
+
+---
+
+[Request interrupted by user]
+
+---
+
+mastra自体アップデートして、スコープもthreadで
+
+---
+
+いや、4oを本体のエージェントと同じく利用して
+
+---
+
+lastMessages: 50っているのかな？？
+
+---
+
+zodのwarning
+
+---
+
+[Request interrupted by user]
+
+---
+
+zodのwarningなおしてほしい
+
+---
+
+"overrides": {
+    "zod": "$zod"
+  },
+実際これいる？？
+
+---
+
+ブランチきって、コミット、プルリクつくって

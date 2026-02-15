@@ -1,5 +1,11 @@
 import { ChatPostMessageResponse, WebClient } from '@slack/web-api';
 
+export type StreamChunkCallback = (text: string) => Promise<void>;
+export type StreamExecutorResult = string | { type: string };
+export type StreamExecutor<TResult extends StreamExecutorResult = StreamExecutorResult> = (
+  onChunk: StreamChunkCallback,
+) => Promise<TResult>;
+
 export type ChatStreamClient = {
   postMessage: (args: {
     channel: string;
@@ -39,15 +45,15 @@ export const getChatStreamClient = (client: WebClient): ChatStreamClient => {
   };
 };
 
-export const streamToSlack = async (
+export const streamToSlack = async <TResult extends StreamExecutorResult>(
   chatClient: ChatStreamClient,
   channel: string,
   threadTs: string,
-  executor: (onChunk: (text: string) => Promise<void>) => Promise<string | { type: string }>,
+  executor: StreamExecutor<TResult>,
   teamId?: string,
   userId?: string,
-  finalPrefix?: string,
-) => {
+  initialPrefix?: string,
+): Promise<TResult> => {
   const streamResponse = await chatClient.startStream({
     channel,
     thread_ts: threadTs,
@@ -62,7 +68,8 @@ export const streamToSlack = async (
   try {
     const result = await executor(async (chunk: string) => {
       if (streamOpen && streamTs) {
-        const textToAppend = streamedText === '' && finalPrefix ? `${finalPrefix}${chunk}` : chunk;
+        const textToAppend =
+          streamedText === '' && initialPrefix ? `${initialPrefix}${chunk}` : chunk;
         streamedText += textToAppend;
         await chatClient.appendStream({
           channel,
@@ -76,7 +83,7 @@ export const streamToSlack = async (
     if (streamTs) {
       let finalAppendText: string | undefined;
       if (typeof result === 'string') {
-        const expectedFinalText = finalPrefix ? `${finalPrefix}${result}` : result;
+        const expectedFinalText = initialPrefix ? `${initialPrefix}${result}` : result;
         if (streamedText !== expectedFinalText) {
           finalAppendText = expectedFinalText.startsWith(streamedText)
             ? expectedFinalText.slice(streamedText.length)

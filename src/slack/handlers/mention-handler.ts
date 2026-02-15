@@ -1,10 +1,12 @@
 import { WebClient } from '@slack/web-api';
 import { mastra } from '../../mastra';
 import { executeAgent } from '../../mastra/services/agent-executor';
+import type { AgentExecutionResult } from '../../mastra/services/agent-executor';
 import { LOG_PREFIXES, MESSAGES } from '../constants';
 import { MentionHandlerArgs } from '../types/handler-args';
 import { postApprovalRequest } from '../ui/approval-blocks';
 import { getChatStreamClient, streamToSlack } from '../utils/chat-stream';
+import type { ChatStreamClient, StreamChunkCallback } from '../utils/chat-stream';
 import { handleError } from '../utils/error-handler';
 import { generateThreadId } from '../utils/thread-id';
 
@@ -44,7 +46,7 @@ export const handleMention = async ({ event, say, client }: MentionHandlerArgs) 
       chatClient,
       channel,
       processingMessageTs ?? ts,
-      async (onChunk: (text: string) => Promise<void>) => {
+      async (onChunk: StreamChunkCallback) => {
         return await executeAgent(
           mastra.getAgent('assistantAgent'),
           cleanText,
@@ -62,7 +64,7 @@ export const handleMention = async ({ event, say, client }: MentionHandlerArgs) 
     // streamToSlack closes the stream on finish. capture result.
 
     await updateMessageForResult({
-      result: result as Awaited<ReturnType<typeof executeAgent>>, // Cast because helper returns string | object
+      result,
       client,
       chatClient,
       channel,
@@ -87,9 +89,9 @@ export const handleMention = async ({ event, say, client }: MentionHandlerArgs) 
  * エージェント実行結果に応じてメッセージを更新
  */
 async function updateMessageForResult(params: {
-  result: Awaited<ReturnType<typeof executeAgent>>;
+  result: AgentExecutionResult;
   client: WebClient;
-  chatClient: ReturnType<typeof getChatStreamClient>;
+  chatClient: ChatStreamClient;
   channel: string;
   messageTs: string;
   threadTs: string;

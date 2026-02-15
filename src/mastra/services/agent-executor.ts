@@ -1,14 +1,16 @@
 import { Agent } from '@mastra/core/agent';
 
+export type ApprovalRequiredResult = {
+  type: 'approval-required';
+  agentName: string;
+  runId: string;
+  toolCallId: string;
+  toolName: string;
+  args: Record<string, unknown>;
+};
+
 export type AgentExecutionResult =
-  | {
-      type: 'approval-required';
-      agentName: string;
-      runId: string;
-      toolCallId: string;
-      toolName: string;
-      args: Record<string, unknown>;
-    }
+  | ApprovalRequiredResult
   | { type: 'completed'; text: string }
   | { type: 'error'; error: Error };
 
@@ -16,40 +18,24 @@ export type StreamCallback = (chunk: string) => Promise<void>;
 
 type AgentStreamOutput = Awaited<ReturnType<Agent['stream']>>;
 type StreamIterator = AgentStreamOutput['fullStream'] | AsyncIterable<unknown>;
+type AgentStreamChunk = { type: string; runId?: string; payload?: Record<string, unknown> };
+type AgentStreamResult = string | ApprovalRequiredResult;
 
 async function handleStream(
   stream: StreamIterator,
   onStreamChunk?: StreamCallback,
-  context?: string,
-): Promise<
-  | string
-  | {
-      type: 'approval-required';
-      agentName: string;
-      runId: string;
-      toolCallId: string;
-      toolName: string;
-      args: Record<string, unknown>;
-    }
-> {
+): Promise<AgentStreamResult> {
   let fullText = '';
-  const logPrefix = context ? `[handleStream:${context}]` : '[handleStream]';
+  const logPrefix = '[handleStream]';
 
   console.log(`${logPrefix} Starting stream processing`);
 
   // Store approval info if detected - we must consume the entire stream before returning
-  let approvalResult: {
-    type: 'approval-required';
-    agentName: string;
-    runId: string;
-    toolCallId: string;
-    toolName: string;
-    args: Record<string, unknown>;
-  } | null = null;
+  let approvalResult: ApprovalRequiredResult | null = null;
 
   // Use raw stream to iterate - MUST consume entire stream for snapshot to be saved
   for await (const chunk of stream as AsyncIterable<unknown>) {
-    const typedChunk = chunk as { type: string; runId?: string; payload?: Record<string, unknown> };
+    const typedChunk = chunk as AgentStreamChunk;
 
     // Log all chunk types for debugging
     console.log(
@@ -129,7 +115,7 @@ export const executeAgent = async (
       },
     });
 
-    const result = await handleStream(output.fullStream, onStreamChunk, 'executeAgent');
+    const result = await handleStream(output.fullStream, onStreamChunk);
 
     if (typeof result === 'object') {
       return result;
@@ -160,7 +146,7 @@ export const approveToolCall = async (
       toolCallId,
     });
 
-    const result = await handleStream(output.fullStream, onStreamChunk, 'approveToolCall');
+    const result = await handleStream(output.fullStream, onStreamChunk);
     if (typeof result === 'object') {
       // Approval shouldn't trigger another approval immediately in this simple agent,
       // but if it does, we treat it as done or recurse?
@@ -192,7 +178,7 @@ export const declineToolCall = async (
       toolCallId,
     });
 
-    const result = await handleStream(output.fullStream, onStreamChunk, 'declineToolCall');
+    const result = await handleStream(output.fullStream, onStreamChunk);
     // Decline shouldn't trigger approval
     if (typeof result === 'object') {
       console.log('[declineToolCall] Unexpected nested approval:', JSON.stringify(result));

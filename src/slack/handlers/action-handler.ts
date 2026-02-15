@@ -4,6 +4,7 @@ import { LOG_PREFIXES, MESSAGES } from '../constants';
 import { ActionHandlerArgs } from '../types/handler-args';
 import { updateApprovalMessage } from '../ui/approval-blocks';
 import { getChatStreamClient, streamToSlack } from '../utils/chat-stream';
+import type { StreamChunkCallback } from '../utils/chat-stream';
 import { handleError } from '../utils/error-handler';
 import { IdParseError, parseActionId } from '../utils/id-parser';
 
@@ -38,7 +39,7 @@ export const handleAction = async ({ action, ack, body, client }: ActionHandlerA
         channel.id,
         message.thread_ts ?? message.ts,
 
-        async (onChunk: (text: string) => Promise<void>) => {
+        async (onChunk: StreamChunkCallback) => {
           return await approveToolCall(
             mastra.getAgent('assistantAgent'),
             runId,
@@ -67,7 +68,7 @@ export const handleAction = async ({ action, ack, body, client }: ActionHandlerA
         channel.id,
         message.thread_ts ?? message.ts,
 
-        async (onChunk: (text: string) => Promise<void>) => {
+        async (onChunk: StreamChunkCallback) => {
           return await declineToolCall(
             mastra.getAgent('assistantAgent'),
             runId,

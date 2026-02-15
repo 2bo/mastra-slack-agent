@@ -2,10 +2,11 @@ import { Mastra } from '@mastra/core/mastra';
 import { LibSQLStore } from '@mastra/libsql';
 import { PinoLogger } from '@mastra/loggers';
 import { assistantAgent } from './agents/assistant-agent';
+import { ASSISTANT_AGENT_KEY } from './constants';
 
 export const mastra = new Mastra({
   agents: {
-    assistantAgent,
+    [ASSISTANT_AGENT_KEY]: assistantAgent,
   },
   scorers: {},
   storage: new LibSQLStore({

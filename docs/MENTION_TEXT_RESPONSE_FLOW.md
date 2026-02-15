@@ -6,6 +6,8 @@
 
 - `src/index.ts`
 - `src/slack/handlers/mention-handler.ts`
+- `src/slack/services/mention-response-service.ts`
+- `src/slack/services/agent-result-presenter.ts`
 - `src/slack/utils/chat-stream.ts`
 - `src/mastra/services/agent-executor.ts`
 - `src/mastra/agents/assistant-agent.ts`
@@ -20,46 +22,48 @@
 
 1. `src/index.ts` で `app.event('app_mention', handleMention)` が登録されている
 2. Slack から `app_mention` が来ると `handleMention` が実行される
-3. `handleMention` が進捗メッセージを投稿し、`streamToSlack(...)` を呼ぶ
-4. `streamToSlack` が `chat.startStream` を開始し、`executor` を実行する
-5. `executor` 内で `executeAgent(...)` を呼ぶ
-6. `executeAgent` が `assistantAgent.stream(...)` を実行し、`text-delta` を受ける
-7. `text-delta` ごとに `onChunk` が呼ばれ、`appendStream` で Slack に追記される
-8. ストリーム完了後、`executeAgent` は `{ type: 'completed', text }` を返す
-9. `streamToSlack` が `stopStream` して `handleMention` に戻る
-10. `handleMention` が `updateMessageForResult` で `completed` 分岐に入り、進捗メッセージを削除して終了
+3. `handleMention` が入力チェック後に `runMentionResponseFlow(...)` を呼ぶ
+4. `runMentionResponseFlow` が進捗メッセージを投稿して `streamToSlack({ ... })` を呼ぶ
+5. `streamToSlack` が `chat.startStream` を開始し、`executor` を実行する
+6. `executor` 内で `executeAgent(...)` を呼ぶ
+7. `executeAgent` が `assistantAgent.stream(...)` を実行し、`text-delta` を受ける
+8. `text-delta` ごとに `onChunk` が呼ばれ、`appendStream` で Slack に追記される
+9. ストリーム完了後、`executeAgent` は `{ type: 'completed', text }` を返す
+10. `streamToSlack` が `stopStream` して `runMentionResponseFlow` に戻る
+11. `runMentionResponseFlow` が `presentMentionResult` の `completed` 分岐で進捗メッセージを削除して終了
 
 ## 関数呼び出し関係図（通常応答）
 
 ```mermaid
 flowchart TD
   A["Slack app_mention event"] --> B["handleMention\nsrc/slack/handlers/mention-handler.ts"]
+  B --> C["runMentionResponseFlow\nsrc/slack/services/mention-response-service.ts"]
 
-  B --> C["getChatStreamClient"]
-  B --> D["chatClient.postMessage\nprocessing message"]
-  B --> E["streamToSlack"]
+  C --> D["getChatStreamClient"]
+  C --> E["chatClient.postMessage\nprocessing message"]
+  C --> F["streamToSlack"]
 
-  E --> F["chatClient.startStream"]
-  E --> G["executor(onChunk)"]
+  F --> G["chatClient.startStream"]
+  F --> H["executor(onChunk)"]
 
-  G --> H["executeAgent\nsrc/mastra/services/agent-executor.ts"]
-  H --> I["assistantAgent.stream\nsrc/mastra/agents/assistant-agent.ts"]
-  H --> J["handleStream"]
+  H --> I["executeAgent\nsrc/mastra/services/agent-executor.ts"]
+  I --> J["assistantAgent.stream\nsrc/mastra/agents/assistant-agent.ts"]
+  I --> K["handleStream"]
 
-  J --> K["text-delta chunk"]
-  K --> L["onStreamChunk(textChunk)"]
-  L --> M["onChunk(chunk) in streamToSlack"]
-  M --> N["chatClient.appendStream"]
+  K --> L["text-delta chunk"]
+  L --> M["onStreamChunk(textChunk)"]
+  M --> N["onChunk(chunk) in streamToSlack"]
+  N --> O["chatClient.appendStream"]
 
-  J --> O["return fullText"]
-  H --> P["return AgentExecutionResult completed"]
-  G --> Q["executor result"]
+  K --> P["return fullText"]
+  I --> Q["return AgentExecutionResult completed"]
+  H --> R["executor result"]
 
-  E --> R["chatClient.stopStream"]
-  E --> S["return result"]
-  S --> T["updateMessageForResult"]
-  T --> U["case completed"]
-  U --> V["client.chat.delete\nprocessing message"]
+  F --> S["chatClient.stopStream"]
+  F --> T["return result"]
+  T --> U["presentMentionResult"]
+  U --> V["case completed -> delete processing message"]
+  V --> W["client.chat.delete\nprocessing message"]
 ```
 
 ## どこから読むか（推奨順）
@@ -71,32 +75,54 @@ flowchart TD
 - `app.event('app_mention', handleMention);`
 - まず「どのイベントがどのハンドラに入るか」だけ確認する
 
-### 2. メンションハンドラの主処理を追う
+### 2. メンションハンドラの責務を追う
 
 `src/slack/handlers/mention-handler.ts`
 
 注目ポイント:
 
 - `cleanText` でメンション文字を除去
-- `chatClient.postMessage(...)` で進捗メッセージ投稿
-- `streamToSlack(...)` 呼び出し
-  - ここで渡す第4引数 `executor` が実処理本体
-  - `executor` は `executeAgent(..., onChunk)` を呼ぶ
-- `updateMessageForResult(...)` で最終分岐
+- 入力チェック（空メンション / user 不在）
+- `runMentionResponseFlow(...)` を呼ぶだけ
 
 このファイルで把握すべきこと:
 
-- Slack UI 更新の責務はここ
-- AI 実行そのものは `executeAgent` に委譲
-- ストリーミングの配信制御は `streamToSlack` に委譲
+- 「イベント入口」と「入力バリデーション」が責務
+- 実行フロー本体は `mention-response-service` に委譲
 
-### 3. ストリーミング配信の仕組みを追う
+### 3. メンション応答サービスを追う
+
+`src/slack/services/mention-response-service.ts`
+
+注目ポイント:
+
+- `chatClient.postMessage(...)` で進捗メッセージ投稿
+- `streamToSlack({ ... })` 呼び出し
+  - `executor` は `executeAgent(..., onChunk)` を呼ぶ
+- `presentMentionResult(...)` で `completed/approval-required/error` を分岐
+
+このファイルで把握すべきこと:
+
+- Slack UI更新とエージェント実行のオーケストレーション責務
+
+### 3.5 結果プレゼンテーションを追う
+
+`src/slack/services/agent-result-presenter.ts`
+
+注目ポイント:
+
+- `presentMentionResult` は `approval-required` で承認UI投稿 + waiting 表示更新
+- `presentMentionResult` は `completed` で Processing メッセージを削除
+- `presentMentionResult` は `error` を `handleError` に委譲
+- `presentActionResult` は `completed` で追加 UI 更新なし、`approval-required/error` は `handleError` に委譲
+
+### 4. ストリーミング配信の仕組みを追う
 
 `src/slack/utils/chat-stream.ts`
 
 注目ポイント:
 
-- `streamToSlack(...)` の引数
+- `streamToSlack({ ... })` の引数
   - `executor` は「onChunk を受けて結果を返す関数」
 - `startStream(...)` で Slack ストリーム開始
 - `executor(async (chunk) => { ... })` のコールバックが `onChunk` 本体
@@ -108,7 +134,7 @@ flowchart TD
 - 生成はしない。Slack への表示更新だけ担当
 - `onChunk` はここで定義して `executeAgent` 側に渡している
 
-### 4. エージェント実行と chunk 解釈を追う
+### 5. エージェント実行と chunk 解釈を追う
 
 `src/mastra/services/agent-executor.ts`
 
@@ -127,7 +153,7 @@ flowchart TD
 - LLM ストリームの chunk をどう最終結果に変換しているか
 - `text-delta -> onChunk -> Slack append` の橋渡し
 
-### 5. エージェント構成を確認する
+### 6. エージェント構成を確認する
 
 `src/mastra/agents/assistant-agent.ts`
 
@@ -146,17 +172,18 @@ flowchart TD
 
 1. ユーザーがチャンネルで `@bot ...` を投稿
 2. Slack Bolt が `app_mention` を受信し `handleMention` 実行
-3. `handleMention` が質問文を整形し、進捗メッセージを投稿
-4. `handleMention` が `streamToSlack` を呼ぶ
-5. `streamToSlack` が `chat.startStream` 実行
-6. `streamToSlack` が `executor` を呼ぶ
-7. `executor` は `executeAgent(..., onChunk)` 実行
-8. `executeAgent` は `assistantAgent.stream` を開始
-9. `handleStream` が `text-delta` を読むたびに `onChunk` 実行
-10. `streamToSlack` 側の `onChunk` が `appendStream` を実行
-11. 生成完了で `executeAgent` が `{ type: 'completed', text }` を返す
-12. `streamToSlack` が `stopStream` して `result` を返す
-13. `handleMention` の `updateMessageForResult` が `completed` 分岐で進捗メッセージ削除
+3. `handleMention` が質問文を整形し `runMentionResponseFlow` を呼ぶ
+4. `runMentionResponseFlow` が進捗メッセージを投稿
+5. `runMentionResponseFlow` が `streamToSlack` を呼ぶ
+6. `streamToSlack` が `chat.startStream` 実行
+7. `streamToSlack` が `executor` を呼ぶ
+8. `executor` は `executeAgent(..., onChunk)` 実行
+9. `executeAgent` は `assistantAgent.stream` を開始
+10. `handleStream` が `text-delta` を読むたびに `onChunk` 実行
+11. `streamToSlack` 側の `onChunk` が `appendStream` を実行
+12. 生成完了で `executeAgent` が `{ type: 'completed', text }` を返す
+13. `streamToSlack` が `stopStream` して `result` を返す
+14. `runMentionResponseFlow` の `presentMentionResult` が `completed` 分岐で進捗メッセージ削除
 
 ## 読み解きのコツ
 

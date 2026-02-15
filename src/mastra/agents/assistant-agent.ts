@@ -2,11 +2,12 @@ import { openai } from '@ai-sdk/openai';
 import { Agent } from '@mastra/core/agent';
 import { LibSQLStore, LibSQLVector } from '@mastra/libsql';
 import { Memory } from '@mastra/memory';
+import { ASSISTANT_AGENT_ID, ASSISTANT_AGENT_NAME } from '../constants';
 import { createEvent, listEvents, searchEvents } from '../tools/google-calendar';
 
 export const assistantAgent = new Agent({
-  id: 'assistant-agent',
-  name: 'Assistant Agent',
+  id: ASSISTANT_AGENT_ID,
+  name: ASSISTANT_AGENT_NAME,
   instructions: () => {
     const now = new Date();
     const timezone = process.env.TIMEZONE || 'Asia/Tokyo';

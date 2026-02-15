@@ -2,80 +2,82 @@ import { Agent } from '@mastra/core/agent';
 
 export type ApprovalRequiredResult = {
   type: 'approval-required';
-  agentName: string;
   runId: string;
   toolCallId: string;
   toolName: string;
   args: Record<string, unknown>;
 };
 
-export type AgentExecutionResult =
-  | ApprovalRequiredResult
-  | { type: 'completed'; text: string }
-  | { type: 'error'; error: Error };
+export type CompletedResult = { type: 'completed'; text: string };
+export type ErrorResult = { type: 'error'; error: Error };
+export type AgentExecutionResult = ApprovalRequiredResult | CompletedResult | ErrorResult;
 
 export type StreamCallback = (chunk: string) => Promise<void>;
 
 type AgentStreamOutput = Awaited<ReturnType<Agent['stream']>>;
 type StreamIterator = AgentStreamOutput['fullStream'] | AsyncIterable<unknown>;
-type AgentStreamChunk = { type: string; runId?: string; payload?: Record<string, unknown> };
+type AgentStreamChunk = { type: string; runId?: string; payload?: unknown };
 type AgentStreamResult = string | ApprovalRequiredResult;
 
+const toError = (error: unknown): Error => {
+  return error instanceof Error ? error : new Error(String(error));
+};
+
+const normalizeSnapshotError = (error: unknown): Error => {
+  if (error instanceof Error && error.message.includes('No snapshot found')) {
+    return new Error('Session expired. Please retry your request.');
+  }
+  return toError(error);
+};
+
+const toCompleted = (text: string, fallbackText: string): CompletedResult => ({
+  type: 'completed',
+  text: text || fallbackText,
+});
+
+const isRecord = (value: unknown): value is Record<string, unknown> => {
+  return typeof value === 'object' && value !== null;
+};
+
+const parseApprovalPayload = (chunk: AgentStreamChunk): ApprovalRequiredResult | null => {
+  const payload = chunk.payload;
+  if (!isRecord(payload) || !('toolCallId' in payload) || !('toolName' in payload)) {
+    return null;
+  }
+
+  const args = isRecord(payload['args']) ? payload['args'] : {};
+
+  return {
+    type: 'approval-required',
+    runId: chunk.runId || '',
+    toolCallId: String(payload['toolCallId']),
+    toolName: String(payload['toolName']),
+    args,
+  };
+};
+
+/**
+ * ストリームを最後まで消費し、テキストまたは承認要求を返す。
+ * NOTE: snapshot 永続化のため、ストリームは必ず最後まで消費する必要がある。
+ * 不正な approval payload は無視して継続する（例外で中断しない）。
+ */
 async function handleStream(
   stream: StreamIterator,
   onStreamChunk?: StreamCallback,
 ): Promise<AgentStreamResult> {
   let fullText = '';
-  const logPrefix = '[handleStream]';
-
-  console.log(`${logPrefix} Starting stream processing`);
-
-  // Store approval info if detected - we must consume the entire stream before returning
   let approvalResult: ApprovalRequiredResult | null = null;
 
-  // Use raw stream to iterate - MUST consume entire stream for snapshot to be saved
   for await (const chunk of stream as AsyncIterable<unknown>) {
     const typedChunk = chunk as AgentStreamChunk;
 
-    // Log all chunk types for debugging
-    console.log(
-      `${logPrefix} Chunk type: ${typedChunk.type}`,
-      typedChunk.runId ? `runId: ${typedChunk.runId}` : '',
-    );
-
     if (typedChunk.type === 'tool-call-approval' && !approvalResult) {
-      const payload = typedChunk.payload;
-      console.log(`${logPrefix} tool-call-approval payload:`, JSON.stringify(payload));
-      if (
-        payload &&
-        typeof payload === 'object' &&
-        'toolCallId' in payload &&
-        'toolName' in payload
-      ) {
-        console.log(`${logPrefix} Detected approval-required for tool: ${payload['toolName']}`);
-        // Store the approval result but continue consuming the stream
-        approvalResult = {
-          type: 'approval-required',
-          agentName: 'unified',
-          runId: typedChunk.runId || '',
-          toolCallId: String(payload['toolCallId']),
-          toolName: String(payload['toolName']),
-          args: (payload['args'] as Record<string, unknown>) || {},
-        };
-      }
-    }
-
-    if (typedChunk.type === 'tool-call') {
-      console.log(`${logPrefix} tool-call:`, JSON.stringify(typedChunk.payload));
-    }
-
-    if (typedChunk.type === 'tool-result') {
-      console.log(`${logPrefix} tool-result:`, JSON.stringify(typedChunk.payload));
+      approvalResult = parseApprovalPayload(typedChunk);
     }
 
     if (typedChunk.type === 'text-delta') {
       const payload = typedChunk.payload;
-      if (payload && typeof payload === 'object' && 'text' in payload) {
+      if (isRecord(payload) && 'text' in payload) {
         const textChunk = String(payload['text']);
         fullText += textChunk;
         if (onStreamChunk) {
@@ -85,15 +87,7 @@ async function handleStream(
     }
   }
 
-  console.log(`${logPrefix} Stream completed. Full text length: ${fullText.length}`);
-
-  // Return approval result if one was detected during stream processing
-  if (approvalResult) {
-    console.log(`${logPrefix} Returning approval-required after stream completed`);
-    return approvalResult;
-  }
-
-  return fullText;
+  return approvalResult ?? fullText;
 }
 
 export const executeAgent = async (
@@ -103,11 +97,6 @@ export const executeAgent = async (
   onStreamChunk?: StreamCallback,
 ): Promise<AgentExecutionResult> => {
   try {
-    console.log('[AgentExecutor] Memory context:', {
-      resource: context.resourceId,
-      thread: context.threadId,
-    });
-
     const output = await agent.stream(query, {
       memory: {
         resource: context.resourceId,
@@ -121,17 +110,29 @@ export const executeAgent = async (
       return result;
     }
 
-    return {
-      type: 'completed',
-      text: result || 'Done.',
-    };
+    return toCompleted(result, 'Done.');
   } catch (error) {
     console.error('[AgentExecutor] Error during agent execution:', error);
-    return {
-      type: 'error',
-      error: error instanceof Error ? error : new Error(String(error)),
-    };
+    return { type: 'error', error: toError(error) };
   }
+};
+
+/**
+ * approve/decline 共通: ツールコール応答後のストリームを処理し結果を返す
+ */
+const resumeToolCallStream = async (
+  streamOutput: AgentStreamOutput,
+  fallbackText: string,
+  onStreamChunk?: StreamCallback,
+): Promise<AgentExecutionResult> => {
+  const result = await handleStream(streamOutput.fullStream, onStreamChunk);
+
+  // approve/decline 後に再度 approval が来ることは想定外だが、安全に処理する
+  if (typeof result === 'object') {
+    return toCompleted('Unexpected nested approval request', 'Unexpected nested approval request');
+  }
+
+  return toCompleted(result, fallbackText);
 };
 
 export const approveToolCall = async (
@@ -139,30 +140,13 @@ export const approveToolCall = async (
   runId: string,
   toolCallId: string,
   onStreamChunk?: StreamCallback,
-): Promise<string> => {
+): Promise<AgentExecutionResult> => {
   try {
-    const output = await agent.approveToolCall({
-      runId,
-      toolCallId,
-    });
-
-    const result = await handleStream(output.fullStream, onStreamChunk);
-    if (typeof result === 'object') {
-      // Approval shouldn't trigger another approval immediately in this simple agent,
-      // but if it does, we treat it as done or recurse?
-      // For now, assuming approval just returns text is safe for this specific agent structure.
-      // But purely for type safety:
-      console.log('[approveToolCall] Unexpected nested approval:', JSON.stringify(result));
-      return 'Unexpected nested approval request';
-    }
-
-    return result || '✅ Completed.';
+    const output = await agent.approveToolCall({ runId, toolCallId });
+    return await resumeToolCallStream(output, '✅ Completed.', onStreamChunk);
   } catch (error) {
     console.error('[AgentExecutor] Error approving tool call:', error);
-    if (error instanceof Error && error.message.includes('No snapshot found')) {
-      throw new Error('Session expired. Please retry your request.');
-    }
-    throw error;
+    return { type: 'error', error: normalizeSnapshotError(error) };
   }
 };
 
@@ -171,26 +155,12 @@ export const declineToolCall = async (
   runId: string,
   toolCallId: string,
   onStreamChunk?: StreamCallback,
-): Promise<string> => {
+): Promise<AgentExecutionResult> => {
   try {
-    const output = await agent.declineToolCall({
-      runId,
-      toolCallId,
-    });
-
-    const result = await handleStream(output.fullStream, onStreamChunk);
-    // Decline shouldn't trigger approval
-    if (typeof result === 'object') {
-      console.log('[declineToolCall] Unexpected nested approval:', JSON.stringify(result));
-      return 'Unexpected nested approval during decline';
-    }
-
-    return result || 'No response.';
+    const output = await agent.declineToolCall({ runId, toolCallId });
+    return await resumeToolCallStream(output, 'No response.', onStreamChunk);
   } catch (error) {
     console.error('[AgentExecutor] Error declining tool call:', error);
-    if (error instanceof Error && error.message.includes('No snapshot found')) {
-      throw new Error('Session expired. Please retry your request.');
-    }
-    throw error;
+    return { type: 'error', error: normalizeSnapshotError(error) };
   }
 };

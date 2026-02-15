@@ -9,7 +9,7 @@ const TOOL_CALL_ID = 'tc-1';
 type StreamChunk = {
   type: string;
   runId?: string;
-  payload?: Record<string, unknown>;
+  payload?: unknown;
 };
 
 const createStreamOutput = (chunks: StreamChunk[]) => ({
@@ -103,11 +103,38 @@ describe('executeAgent', () => {
 
     await expect(executeAgent(agent, 'create event', CONTEXT)).resolves.toEqual({
       type: 'approval-required',
-      agentName: 'unified',
       runId: 'run-abc',
       toolCallId: 'tc-123',
       toolName: 'createEvent',
       args: { summary: 'Meeting' },
+    });
+  });
+
+  it('tool-call-approval の payload が不正でも例外にせず継続する', async () => {
+    const agent = createAgentStub({
+      streamChunks: [
+        {
+          type: 'tool-call-approval',
+          runId: 'run-abc',
+          payload: null,
+        },
+        {
+          type: 'tool-call-approval',
+          runId: 'run-abc',
+          payload: 'broken-payload',
+        },
+        {
+          type: 'tool-call-approval',
+          runId: 'run-abc',
+          payload: { toolCallId: 'tc-only' },
+        },
+        textDelta('still works'),
+      ],
+    });
+
+    await expect(executeAgent(agent, 'hi', CONTEXT)).resolves.toEqual({
+      type: 'completed',
+      text: 'still works',
     });
   });
 
@@ -122,57 +149,74 @@ describe('executeAgent', () => {
 });
 
 describe('approveToolCall', () => {
-  it('テキストを連結して返す', async () => {
+  it('テキストを連結して completed を返す', async () => {
     const agent = createAgentStub({
       approveChunks: [textDelta('Event created'), textDelta(' successfully')],
     });
 
-    await expect(approveToolCall(agent, RUN_ID, TOOL_CALL_ID)).resolves.toBe(
-      'Event created successfully',
-    );
+    await expect(approveToolCall(agent, RUN_ID, TOOL_CALL_ID)).resolves.toEqual({
+      type: 'completed',
+      text: 'Event created successfully',
+    });
   });
 
-  it('テキストが空ならフォールバックを返す', async () => {
+  it('テキストが空なら completed フォールバックを返す', async () => {
     const agent = createAgentStub({ approveChunks: [] });
 
-    await expect(approveToolCall(agent, RUN_ID, TOOL_CALL_ID)).resolves.toBe('✅ Completed.');
+    await expect(approveToolCall(agent, RUN_ID, TOOL_CALL_ID)).resolves.toEqual({
+      type: 'completed',
+      text: '✅ Completed.',
+    });
   });
 
-  it('No snapshot found は期限切れに変換し、他は再スローする', async () => {
+  it('No snapshot found は期限切れに変換し、他も error 結果で返す', async () => {
     const expiredAgent = createErrorAgent('approveToolCall', 'No snapshot found for run-1');
 
-    await expect(approveToolCall(expiredAgent, RUN_ID, TOOL_CALL_ID)).rejects.toThrow(
-      'Session expired. Please retry your request.',
-    );
+    await expect(approveToolCall(expiredAgent, RUN_ID, TOOL_CALL_ID)).resolves.toEqual({
+      type: 'error',
+      error: expect.objectContaining({
+        message: 'Session expired. Please retry your request.',
+      }),
+    });
 
     const agent = createErrorAgent('approveToolCall', 'Unknown error');
 
-    await expect(approveToolCall(agent, RUN_ID, TOOL_CALL_ID)).rejects.toThrow('Unknown error');
+    await expect(approveToolCall(agent, RUN_ID, TOOL_CALL_ID)).resolves.toEqual({
+      type: 'error',
+      error: expect.objectContaining({ message: 'Unknown error' }),
+    });
   });
 });
 
 describe('declineToolCall', () => {
-  it('テキストを連結して返す', async () => {
+  it('テキストを連結して completed を返す', async () => {
     const agent = createAgentStub({
       declineChunks: [textDelta('Understood, cancelled.')],
     });
 
-    await expect(declineToolCall(agent, RUN_ID, TOOL_CALL_ID)).resolves.toBe(
-      'Understood, cancelled.',
-    );
+    await expect(declineToolCall(agent, RUN_ID, TOOL_CALL_ID)).resolves.toEqual({
+      type: 'completed',
+      text: 'Understood, cancelled.',
+    });
   });
 
-  it('テキストが空ならフォールバックを返す', async () => {
+  it('テキストが空なら completed フォールバックを返す', async () => {
     const agent = createAgentStub({ declineChunks: [] });
 
-    await expect(declineToolCall(agent, RUN_ID, TOOL_CALL_ID)).resolves.toBe('No response.');
+    await expect(declineToolCall(agent, RUN_ID, TOOL_CALL_ID)).resolves.toEqual({
+      type: 'completed',
+      text: 'No response.',
+    });
   });
 
-  it('No snapshot found は期限切れエラーに変換する', async () => {
+  it('No snapshot found は期限切れの error 結果に変換する', async () => {
     const agent = createErrorAgent('declineToolCall', 'No snapshot found for run-1');
 
-    await expect(declineToolCall(agent, RUN_ID, TOOL_CALL_ID)).rejects.toThrow(
-      'Session expired. Please retry your request.',
-    );
+    await expect(declineToolCall(agent, RUN_ID, TOOL_CALL_ID)).resolves.toEqual({
+      type: 'error',
+      error: expect.objectContaining({
+        message: 'Session expired. Please retry your request.',
+      }),
+    });
   });
 });

@@ -45,7 +45,10 @@ const ACTION_STREAM_CONFIG: Record<ActionType, ActionStreamConfig> = {
 
 const isActionType = (type: string): type is ActionType => type === 'approve' || type === 'reject';
 
-const parseActionContext = (actionId: string, body: ActionHandlerArgs['body']): ActionContext | null => {
+const parseActionContext = (
+  actionId: string,
+  body: ActionHandlerArgs['body'],
+): ActionContext | null => {
   let parsed;
   try {
     parsed = parseActionId(actionId);
@@ -79,8 +82,17 @@ const parseActionContext = (actionId: string, body: ActionHandlerArgs['body']): 
 };
 
 const runActionStream = async (client: ActionHandlerArgs['client'], context: ActionContext) => {
-  const { type, runId, toolCallId, channelId, messageTs, responseThreadTs, errorThreadTs, teamId, userId } =
-    context;
+  const {
+    type,
+    runId,
+    toolCallId,
+    channelId,
+    messageTs,
+    responseThreadTs,
+    errorThreadTs,
+    teamId,
+    userId,
+  } = context;
   const config = ACTION_STREAM_CONFIG[type];
   const chatClient = getChatStreamClient(client);
 

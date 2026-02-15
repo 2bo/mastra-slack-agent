@@ -1,6 +1,6 @@
 import { openai } from '@ai-sdk/openai';
 import { Agent } from '@mastra/core/agent';
-import { LibSQLStore, LibSQLVector } from '@mastra/libsql';
+import { LibSQLStore } from '@mastra/libsql';
 import { Memory } from '@mastra/memory';
 import { ASSISTANT_AGENT_ID, ASSISTANT_AGENT_NAME } from '../constants';
 import { createEvent, listEvents, searchEvents } from '../tools/google-calendar';
@@ -33,18 +33,10 @@ export const assistantAgent = new Agent({
       url: process.env.TURSO_DATABASE_URL || 'file:mastra.db',
       authToken: process.env.TURSO_AUTH_TOKEN,
     }),
-    vector: new LibSQLVector({
-      id: 'memory-vector',
-      url: process.env.TURSO_DATABASE_URL || 'file:mastra.db',
-      authToken: process.env.TURSO_AUTH_TOKEN,
-    }),
-    embedder: openai.embedding('text-embedding-3-small'),
     options: {
-      lastMessages: 50,
-      semanticRecall: {
+      observationalMemory: {
+        model: 'openai/gpt-4o',
         scope: 'thread',
-        topK: 5,
-        messageRange: 100,
       },
     },
   }),

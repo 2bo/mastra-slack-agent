@@ -22,9 +22,7 @@ describe('parseActionId', () => {
     } catch (error) {
       expect(error).toBeInstanceOf(IdParseError);
       expect((error as IdParseError).rawId).toBe('approve::run-123:tc-456');
-      expect((error as IdParseError).message).toContain(
-        'type:agentName:runId:toolCallId',
-      );
+      expect((error as IdParseError).message).toContain('type:agentName:runId:toolCallId');
       expect((error as IdParseError).message).toContain('approve:assistant:run-123:tc-456');
     }
   });

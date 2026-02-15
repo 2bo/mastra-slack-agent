@@ -3,7 +3,7 @@ import { Agent } from '@mastra/core/agent';
 import { LibSQLStore } from '@mastra/libsql';
 import { Memory } from '@mastra/memory';
 import { ASSISTANT_AGENT_ID, ASSISTANT_AGENT_NAME } from '../constants';
-import { createEvent, listEvents, searchEvents } from '../tools/google-calendar';
+import { createEvent, deleteEvent, listEvents, searchEvents } from '../tools/google-calendar';
 
 export const assistantAgent = new Agent({
   id: ASSISTANT_AGENT_ID,
@@ -21,7 +21,8 @@ export const assistantAgent = new Agent({
       Current date: ${currentDate} (${timezone})
 
       For calendar requests, use listEvents for schedule overview, searchEvents for specific events,
-      and createEvent to add events (check conflicts first). The createEvent tool has built-in approval.
+      createEvent to add events (check conflicts first), and deleteEvent to remove events by ID.
+      The createEvent and deleteEvent tools have built-in approval.
 
       For general conversation, answer directly using your memory of past interactions.
     `;
@@ -44,5 +45,6 @@ export const assistantAgent = new Agent({
     listEvents,
     searchEvents,
     createEvent: { ...createEvent, requireApproval: true },
+    deleteEvent: { ...deleteEvent, requireApproval: true },
   },
 });

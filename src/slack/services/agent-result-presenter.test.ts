@@ -41,39 +41,42 @@ describe('presentMentionResult', () => {
     vi.clearAllMocks();
   });
 
-  it('approval-required では承認依頼投稿と waiting 表示更新を行う', async () => {
-    const { client } = createClient();
-    const chatClient = createChatStreamClient();
+  it.each(['createEvent', 'deleteEvent'] as const)(
+    'approval-required (%s) では承認依頼投稿と waiting 表示更新を行う',
+    async (toolName) => {
+      const { client } = createClient();
+      const chatClient = createChatStreamClient();
 
-    await presentMentionResult({
-      result: {
-        type: 'approval-required',
+      await presentMentionResult({
+        result: {
+          type: 'approval-required',
+          runId: 'run-1',
+          toolCallId: 'tc-1',
+          toolName,
+          args: { summary: 'Meeting' },
+        },
+        client,
+        chatClient,
+        channel: 'C123',
+        threadTs: '200.000',
+        agentName: 'assistant',
+        messageTs: '111.222',
+      });
+
+      expect(mocks.postApprovalRequest).toHaveBeenCalledWith(client, 'C123', '200.000', {
+        agentName: 'assistant',
         runId: 'run-1',
         toolCallId: 'tc-1',
-        toolName: 'createEvent',
+        toolName,
         args: { summary: 'Meeting' },
-      },
-      client,
-      chatClient,
-      channel: 'C123',
-      threadTs: '200.000',
-      agentName: 'assistant',
-      messageTs: '111.222',
-    });
-
-    expect(mocks.postApprovalRequest).toHaveBeenCalledWith(client, 'C123', '200.000', {
-      agentName: 'assistant',
-      runId: 'run-1',
-      toolCallId: 'tc-1',
-      toolName: 'createEvent',
-      args: { summary: 'Meeting' },
-    });
-    expect(chatClient.update).toHaveBeenCalledWith({
-      channel: 'C123',
-      ts: '111.222',
-      text: MESSAGES.WAITING_APPROVAL,
-    });
-  });
+      });
+      expect(chatClient.update).toHaveBeenCalledWith({
+        channel: 'C123',
+        ts: '111.222',
+        text: MESSAGES.WAITING_APPROVAL,
+      });
+    },
+  );
 
   it('completed では対象メッセージを削除する', async () => {
     const { client, deleteMessage } = createClient();

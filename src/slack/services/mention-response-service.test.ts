@@ -129,43 +129,46 @@ describe('runMentionResponseFlow', () => {
     expect(mocks.handleError).not.toHaveBeenCalled();
   });
 
-  it('approval-required の場合も presenter へ委譲する', async () => {
-    const { client } = createClient();
-    const chatClient = createChatStreamClient();
+  it.each(['createEvent', 'deleteEvent'] as const)(
+    'approval-required (%s) の場合も presenter へ委譲する',
+    async (toolName) => {
+      const { client } = createClient();
+      const chatClient = createChatStreamClient();
 
-    mocks.getChatStreamClient.mockReturnValue(chatClient);
-    mocks.streamToSlack.mockResolvedValue({
-      type: 'approval-required',
-      runId: 'run-1',
-      toolCallId: 'tc-1',
-      toolName: 'createEvent',
-      args: { summary: 'Meeting' },
-    });
+      mocks.getChatStreamClient.mockReturnValue(chatClient);
+      mocks.streamToSlack.mockResolvedValue({
+        type: 'approval-required',
+        runId: 'run-1',
+        toolCallId: 'tc-1',
+        toolName,
+        args: { summary: 'Meeting' },
+      });
 
-    await runMentionResponseFlow({
-      client,
-      channel: 'C123',
-      eventTs: '200.000',
-      teamId: 'T123',
-      userId: 'U123',
-      cleanText: 'please create event',
-    });
+      await runMentionResponseFlow({
+        client,
+        channel: 'C123',
+        eventTs: '200.000',
+        teamId: 'T123',
+        userId: 'U123',
+        cleanText: 'please create event',
+      });
 
-    expect(mocks.presentMentionResult).toHaveBeenCalledWith(
-      expect.objectContaining({
-        result: {
-          type: 'approval-required',
-          runId: 'run-1',
-          toolCallId: 'tc-1',
-          toolName: 'createEvent',
-          args: { summary: 'Meeting' },
-        },
-        threadTs: '200.000',
-        agentName: ASSISTANT_AGENT_ID,
-        messageTs: '111.222',
-      }),
-    );
-  });
+      expect(mocks.presentMentionResult).toHaveBeenCalledWith(
+        expect.objectContaining({
+          result: {
+            type: 'approval-required',
+            runId: 'run-1',
+            toolCallId: 'tc-1',
+            toolName,
+            args: { summary: 'Meeting' },
+          },
+          threadTs: '200.000',
+          agentName: ASSISTANT_AGENT_ID,
+          messageTs: '111.222',
+        }),
+      );
+    },
+  );
 
   it('error 結果は presenter へ委譲する', async () => {
     const { client } = createClient();

@@ -25,18 +25,22 @@ const createMockClient = () =>
   }) as unknown as WebClient;
 
 describe('buildApprovalBlocks', () => {
-  it('必要な2ブロックを返し、approve/reject の action_id を埋め込む', () => {
-    const blocks = buildApprovalBlocks(SAMPLE_PAYLOAD);
+  it.each(['createEvent', 'deleteEvent'] as const)(
+    '%s でも必要な2ブロックを返し、approve/reject の action_id を埋め込む',
+    (toolName) => {
+      const payload = { ...SAMPLE_PAYLOAD, toolName };
+      const blocks = buildApprovalBlocks(payload);
 
-    expect(blocks).toHaveLength(2);
-    expect(blocks[0].type).toBe('section');
-    expect(blocks[1].type).toBe('actions');
-    expect((blocks[0] as { text: { text: string } }).text.text).toContain('createEvent');
+      expect(blocks).toHaveLength(2);
+      expect(blocks[0].type).toBe('section');
+      expect(blocks[1].type).toBe('actions');
+      expect((blocks[0] as { text: { text: string } }).text.text).toContain(toolName);
 
-    const actions = blocks[1] as { type: string; elements: Array<{ action_id: string }> };
-    expect(actions.elements[0].action_id).toBe('approve:assistant:run-123:tc-456');
-    expect(actions.elements[1].action_id).toBe('reject:assistant:run-123:tc-456');
-  });
+      const actions = blocks[1] as { type: string; elements: Array<{ action_id: string }> };
+      expect(actions.elements[0].action_id).toBe('approve:assistant:run-123:tc-456');
+      expect(actions.elements[1].action_id).toBe('reject:assistant:run-123:tc-456');
+    },
+  );
 });
 
 describe('postApprovalRequest', () => {

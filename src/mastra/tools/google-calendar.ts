@@ -174,3 +174,28 @@ export const createEvent = createTool({
     }
   },
 });
+
+export const deleteEvent = createTool({
+  id: 'deleteEvent',
+  description: "Delete an event from the user's Google Calendar by event ID.",
+  requireApproval: true,
+  inputSchema: z.object({
+    eventId: z.string().describe('Google Calendar event ID to delete'),
+  }),
+  execute: async (inputData) => {
+    try {
+      const calendar = getCalendarClient();
+      await calendar.events.delete({
+        calendarId: getCalendarId(),
+        eventId: inputData.eventId,
+      });
+
+      return {
+        message: 'Event deleted successfully',
+        id: inputData.eventId,
+      };
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : String(error) };
+    }
+  },
+});

@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createEvent, listEvents, searchEvents } from './google-calendar';
+import { createEvent, deleteEvent, listEvents, searchEvents } from './google-calendar';
 
 const mocks = vi.hoisted(() => {
   return {
     mList: vi.fn(),
     mInsert: vi.fn(),
+    mDelete: vi.fn(),
     mSetCredentials: vi.fn(),
   };
 });
@@ -21,6 +22,7 @@ vi.mock('googleapis', () => {
         events: {
           list: mocks.mList,
           insert: mocks.mInsert,
+          delete: mocks.mDelete,
         },
       })),
     },
@@ -36,6 +38,8 @@ describe('Google Calendar Tools', () => {
     mocks.mInsert.mockResolvedValue({
       data: { id: '123', htmlLink: 'http://link' },
     });
+    // Default mock for delete
+    mocks.mDelete.mockResolvedValue({});
 
     // Mock env vars
     process.env.GOOGLE_CLIENT_ID = 'test-client-id';
@@ -100,6 +104,10 @@ describe('Google Calendar Tools', () => {
   });
 
   describe('createEvent', () => {
+    it('should require approval', () => {
+      expect(createEvent.requireApproval).toBe(true);
+    });
+
     it('should call events.insert with correct body', async () => {
       await createEvent.execute!(
         {
@@ -120,6 +128,28 @@ describe('Google Calendar Tools', () => {
             start: { dateTime: '2025-12-15T10:00:00+09:00', timeZone: 'Asia/Tokyo' },
             end: { dateTime: '2025-12-15T11:00:00+09:00', timeZone: 'Asia/Tokyo' },
           },
+        }),
+      );
+    });
+  });
+
+  describe('deleteEvent', () => {
+    it('should require approval', () => {
+      expect(deleteEvent.requireApproval).toBe(true);
+    });
+
+    it('should call events.delete with correct parameters', async () => {
+      await deleteEvent.execute!(
+        {
+          eventId: 'event-123',
+        },
+        {},
+      );
+
+      expect(mocks.mDelete).toHaveBeenCalledWith(
+        expect.objectContaining({
+          calendarId: 'primary',
+          eventId: 'event-123',
         }),
       );
     });
